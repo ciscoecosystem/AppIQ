@@ -234,6 +234,7 @@ class ACI_Local(object):
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve Contracts. Error: "+str(e)})
 
 
+    # Reads dn, ip and tenant for an fvIp and returns a list of those dictionaries
     def parseEPsforTemp(self, data, tenant):
         resp = []
         for each in data:

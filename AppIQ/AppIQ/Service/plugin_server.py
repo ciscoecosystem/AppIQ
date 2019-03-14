@@ -176,6 +176,8 @@ def mapping(tenant, appDId):
         #time.sleep(1)
         appId = str(appDId) + str(tenant)
         mapping_dict = {"source_cluster": [], "target_cluster": []}
+        
+        # returns the mapping from Mapping Table
         already_mapped_data = database_object.returnMapping(appId)
         #app.logger.info('Already Mapped Data:'+str(already_mapped_data))
         rec_object = Recommend.Recommend()

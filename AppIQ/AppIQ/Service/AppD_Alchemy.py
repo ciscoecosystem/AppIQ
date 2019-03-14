@@ -356,6 +356,7 @@ class Database():
                 current_app.logger.info('Exception in Check and Delete: ' + str(e))
                 self.commitSession()
 
+    # Gets Data From Table and Updates or Inserts a record with given ID
     def checkIfExistsandUpdate(self, table, data):
         try:
             dataId = data[0]

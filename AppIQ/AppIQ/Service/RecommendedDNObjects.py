@@ -10,6 +10,8 @@ from flask import current_app
 
 
 class Recommend(object):
+
+    # Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps
     def getCommonEPs(self, appd_ip_list, aci_parsed_eps):
         common_list = []
         for each in aci_parsed_eps:
@@ -39,17 +41,22 @@ class Recommend(object):
         for each in common_eps:
             accounted = 0
             for duplicate in common_eps:
+                # For different elements, if IP is same and 'dn' is different
                 if each['IP'] == duplicate['IP'] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate):
                     ap_main,epg_main = self.extract(each['dn'])
                     ap_dup,epg_dup = self.extract(duplicate['dn'])
+                    
+                    # Compare count of 'EPG' for an 'AP'
                     main_count = extract_ap_epgs[ap_main][epg_main]
                     dup_count = extract_ap_epgs[ap_dup][epg_dup]
+                    
                     if main_count > dup_count:
                         ip2_list.append([each['IP'],each['dn'],'Yes'])
                         break
                     elif main_count == dup_count:
                         ap_main_c = len(extract_ap_epgs[ap_main])
                         ap_dup_c = len(extract_ap_epgs[ap_dup])
+                        # Add one with hi
                         if ap_main_c > ap_dup_c:
                             ip2_list.append([each['IP'],each['dn'],'Yes'])
                             break

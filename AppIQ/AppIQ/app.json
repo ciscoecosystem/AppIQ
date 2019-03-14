@@ -2,7 +2,7 @@
     "api":{
         "graphql.json":"GraphQL Json"
     },
-    "apicversion":"2.2(1n)",
+    "apicversion":"3.2(1l)",
     "appid":"AppIQ",
     "author":"Nilay Shah, Devarshi Shah",
     "category":[
@@ -17,7 +17,7 @@
     "iconfile":"appdynamicsicon.png",
     "insertionURL":"fv:infoTenant:center",
     "metaversion":"1.1",
-    "name":"AppIQ (Beta)",
+    "name":"AppIQ",
     "permissions":[
         "tenant-connectivity-mgmt",
         "tenant-connectivity-util",

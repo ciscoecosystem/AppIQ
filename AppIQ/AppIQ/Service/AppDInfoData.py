@@ -415,6 +415,34 @@ class AppD(object):
             list_of_apps.append(app_data)
         return {'app': list_of_apps}
 
+    def get_node_details(self, appId, nodeId):
+        try:
+            node_details_response = requests.get(
+                str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(appId) + '/nodes/' + str(
+                    nodeId) + '?output=JSON', auth=(self.user, self.password))
+            if node_details_response.status_code == 200:
+                if node_details_response.json():
+                    return node_details_response.json()
+                else:
+                    return []
+            else:
+                # Refresh
+                self.check_connection()
+                node_details_response = requests.get(
+                    str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(appId) + '/nodes/' + str(
+                        nodeId) + '?output=JSON', auth=(self.user, self.password))
+                if node_details_response.status_code == 200:
+                    if node_details_response.json():
+                        return node_details_response.json()
+                    else:
+                        return []
+                else:
+                    return []
+        except Exception as ex:
+            current_app.logger.info('Failed to get Node Details for NodeID: ' + nodeId + ' in Application with AppID: ' + appId + '\nException: ' + str(ex))
+            return []
+
+
     def main(self):
         while True:
             self.databaseObject = AppD_Database.Database()
@@ -502,7 +530,19 @@ class AppD(object):
                                                 if node_health != 'UNDEFINED':
                                                     #current_app.logger.info('Node health:' + str(node_health))
                                                     #continue
-                                                    if 'ipAddresses' in node and node.get('ipAddresses'):
+                                                        
+                                                    if 'ipAddresses' in node:
+
+                                                        # If 'ipAddresses' key is None, we make another API Call to get the Node Details
+                                                        if not node.get('ipAddresses'):
+                                                            node_details = self.get_node_details(app.get('id'), node.get('id'))
+                                                            if node_details:
+                                                                node = node_details[0]
+
+                                                                if not node.get('ipAddresses'):
+                                                                    current_app.logger.info("No 'ipAddresses' found in Node Details Response. \nResponse : " + str(node_details))
+                                                                    continue
+                                                        
                                                         if 'ipAddresses' in node.get('ipAddresses') and node.get('ipAddresses').get('ipAddresses'):
                                                             for i in range(len(node.get('ipAddresses').get('ipAddresses'))):
                                                                 if '%' in node.get('ipAddresses').get('ipAddresses')[i]:
@@ -523,6 +563,29 @@ class AppD(object):
                                                                 'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
                                                                     app.get('name')) + ', Tier - ' + str(
                                                                     tier.get('id')) + ', Node - ' + str(node.get('id')))
+                                                        
+                                                    # if 'ipAddresses' in node and node.get('ipAddresses'):
+                                                    #     if 'ipAddresses' in node.get('ipAddresses') and node.get('ipAddresses').get('ipAddresses'):
+                                                    #         for i in range(len(node.get('ipAddresses').get('ipAddresses'))):
+                                                    #             if '%' in node.get('ipAddresses').get('ipAddresses')[i]:
+                                                    #                 ipv6 = node.get('ipAddresses').get('ipAddresses')[i].split('%')[0]
+                                                    #                 ipList.append(str(ipv6))
+                                                    #             else:
+                                                    #                 ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
+                                                    #                 ipList.append(str(ipv4))
+                                                    #         self.databaseObject.checkIfExistsandUpdate('Nodes',
+                                                    #                                                    [node.get('id'),
+                                                    #                                                     str(node.get('name')),
+                                                    #                                                     tier.get('id'),
+                                                    #                                                     str(node_health),
+                                                    #                                                     ipList, app.get('id')])
+                                                    #         nodeidlist.append(node.get('id'))
+                                                    #         ipList = []
+                                                    #         current_app.logger.info(
+                                                    #             'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
+                                                    #                 app.get('name')) + ', Tier - ' + str(
+                                                    #                 tier.get('id')) + ', Node - ' + str(node.get('id')))
+                                                    
                     self.databaseObject.checkAndDelete('Application', appidList)
                     self.databaseObject.checkAndDelete('Tiers', tieridList)
                     self.databaseObject.checkAndDelete('ServiceEndpoints', sepList)
