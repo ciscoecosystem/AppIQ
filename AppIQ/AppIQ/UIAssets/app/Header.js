@@ -14,11 +14,11 @@ class Header extends React.Component {
     render() {
         return (
             <div className="clearfix">
-                <a href="index.html" className="header floal">{this.props.applinktext}</a>
-                <div className="header floal">{this.props.text}</div>
+                <a href="index.html" className="sub-header floal">{this.props.applinktext}</a>
+                <div className="sub-header floal">{this.props.text}</div>
                 <div className="floar">
                     <div className="instancetext">{this.props.instanceName}</div>
-                    <button className="button-logout view-button" onClick={this.handleLogoutClick}> Logout </button>
+                    <button style={{color:"white"}} className="button-logout view-button" onClick={this.handleLogoutClick}> Logout </button>
                 </div>
             </div>
         )

@@ -8,11 +8,12 @@
     font-family: 'Roboto', sans-serif;
 }
 
-.header {
+.sub-header {
     font-family: 'Roboto', sans-serif;
     background-color: transparent;
     font-size: 22px;
     white-space: pre;
+    padding-top: 7px;
     /* top: -4px; */
     position: relative;
     /* //font-weight: lighter; */
@@ -132,6 +133,7 @@ td {
 }
 
 .clearfix {
+    
     overflow: auto;
 }
 

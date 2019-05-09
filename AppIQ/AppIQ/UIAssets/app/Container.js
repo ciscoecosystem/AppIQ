@@ -6,6 +6,8 @@ import { stringify } from 'querystring';
 import Header from './Header'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import AppTable from "./AppTable"
+import './style2.css'
 
 function getCookieVal(offset) {
     var endstr = document.cookie.indexOf(";", offset);
@@ -63,13 +65,15 @@ class Container extends React.Component {
         const rx = /Tenants:(.*)\|/g;
         const topUrl = top.location;
         const tenantNames = rx.exec(topUrl);
-
+        
         this.tenantName = tenantNames[1];
 
         this.notify = this.notify.bind(this);
         this.getData = this.getData.bind(this);
+        this.getStaticData = this.getStaticData.bind(this);
 
         this.getData();
+        // this.getStaticData();
         this.state = {
             "jsonData": jsonData
         }
@@ -142,6 +146,22 @@ class Container extends React.Component {
         }
     }
 
+    getStaticData() {
+        jsonData =  [
+            {
+                "health": "NORMAL",
+                "appProfileName": "TestApplication1",
+                "isViewEnabled": true,
+                "appId": 9
+            },
+            {
+                "health": "NORMAL",
+                "appProfileName": "EComm-NPM-Demo",
+                "isViewEnabled": true,
+                "appId": 13
+            }
+        ];
+    }
 
     /**
     * @param {string} theUrl The URL of the REST API
@@ -242,6 +262,8 @@ class Container extends React.Component {
 
         this.getData();
 
+        // this.getStaticData();
+
         this.setState({
             "jsonData": jsonData
         })
@@ -256,6 +278,8 @@ class Container extends React.Component {
         let data = this.state.jsonData;
         /* generate list of AppInfo components with data as props */
         const list = data;
+        console.log("list data")
+        console.log(list)
         let odd = false;
         let idCounter = 0;
         let appInfoList = list.map((item) => {
@@ -270,7 +294,8 @@ class Container extends React.Component {
             <div>
                 <Header text=" List of Applications" applinktext="" instanceName={headerInstanceName}/>
                 <Toolbar onReload={this.reloading} />
-                <table className="info-table" border="0" width="100%">
+                {/* <DetailsPane/> */}
+                {/* <table className="info-table" border="0" width="100%">
                     <th className="sortable" onClick={() => { this.sortTable(data, "appProfileName") }}>Application Name</th>
                     <th className="sortable" onClick={() => { this.sortTable(data, "health") }}>Health</th>
                     <th></th>
@@ -278,7 +303,8 @@ class Container extends React.Component {
                     <tbody>
                         {appInfoList}
                     </tbody>
-                </table>
+                </table> */}
+                <AppTable rows={list} tenantName={this.tenantName}></AppTable>
                 <br/>
           <ToastContainer />
             </div>
