@@ -71,16 +71,16 @@ export default class LegendNode extends React.Component {
                         {this.props.nodeData.label}
                     </text> : ""}
 
-                {this.props.sub_label ?
+                {this.props.nodeData.sub_label ?
                     <text
-                        className="nodeSubLabel"
+                        className="nodeAttributesBase"
                         y={textLayout.y + 35}
                         textAnchor={textLayout.textAnchor}
                         transform={textLayout.transform}
                         //style={nodeStyle.attributes}
                         dy='10'
                     >
-                        {"(" + this.props.sub_label + ")"}
+                        {this.props.nodeData.sub_label }
                     </text> : ""}
 
             </g>

@@ -1,0 +1,13 @@
+.events-tab .active a{
+    /* background: #00BCEB!important;*/
+    color: white!important; 
+   background-color:  #00BCEB !important;
+   box-shadow: inset 5px 0 #00bceb!important;
+  }
+  .events-tab .tabs--vertical>li:hover>a{
+    box-shadow: inset 5px 0 #00bceb!important;
+  }
+  button.Toastify__close-button.Toastify__close-button--error {
+    color: white;
+  }
+  

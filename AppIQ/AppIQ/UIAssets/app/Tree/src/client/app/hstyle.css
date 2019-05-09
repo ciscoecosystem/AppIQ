@@ -8,7 +8,7 @@
     font-family: 'Roboto', sans-serif;
 }
 
-.header {
+.header-new {
     font-family: 'Roboto', sans-serif;
     background-color: transparent;
     font-size: 22px;
@@ -108,13 +108,12 @@ td {
 }
 
 tr {
-    border-bottom : 1px solid #f0f0f0;
+    /* border-bottom : 1px solid #f0f0f0; */
     padding : 0px;
 }
-tr:hover {
+/* tr:hover {
     background-color : rgb(210,235,246);
-    /* border-left : 3px solid rgb(4,159,217); */
-}
+} */
 
 td {
     margin: 0px;
@@ -131,8 +130,9 @@ td {
     text-align : right;
 }
 
-.clearfix {
-    overflow: auto;
+.clearfix-new {
+   
+    padding-top: 0.6%; 
 }
 
 .floar {

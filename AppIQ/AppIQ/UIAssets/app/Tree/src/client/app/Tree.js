@@ -1,70 +1,77 @@
-import React from 'react';
-import PropTypes from 'prop-types';
-import { TransitionGroup } from 'react-transition-group';
-import { layout, select, behavior, event } from 'd3';
-import d3 from 'd3';
-import clone from 'clone';
-import deepEqual from 'deep-equal';
-import uuid from 'uuid';
+import React from "react";
+import PropTypes from "prop-types";
+import { TransitionGroup } from "react-transition-group";
+import { layout, select, behavior, event } from "d3";
+import d3 from "d3";
+import clone from "clone";
+import deepEqual from "deep-equal";
+import uuid from "uuid";
 
-import Node from './Node.js';
-import Link from './Link.js';
-import './style.css';
+import Node from "./Node.js";
+import Link from "./Link.js";
+import "./style.css";
 
-import LegendNode from './LegendNode.js';
+import DetailsPane from "./DetailsPane";
+import DetailsPage from "./DetailsPage";
+
+import LegendNode from "./LegendNode.js";
 
 const svgSquare = {
-  shape: 'rect',
+  shape: "rect",
   shapeProps: {
-      width: 20,
-      height: 7,
-      x: -10,
-      y: -10,
+    width: 20,
+    height: 7,
+    x: -10,
+    y: -10
   }
-}
+};
 
 const svgSquareButton = {
-  shape: 'rect',
+  shape: "rect",
   shapeProps: {
-      width: 40,
-      height: 20,
-      x: -10,
-      y: -10,
+    width: 40,
+    height: 20,
+    x: -10,
+    y: -10
   }
-}
+};
 
-const svgCircle = { shape: 'circle', shapeProps: { r: 20 } }
+const svgCircle = { shape: "circle", shapeProps: { r: 20 } };
 
-var legend = [{
-  "name": "",
-  "level": "seagreen",
-  "type": "seagreen",
-  "label": "Normal",
-  "trans": 8,
-  "shape": svgSquare
-}, {
-  "name": "",
-  "level": "orange",
-  "type": "orange",
-  "label": "Warning",
-  "trans": 9,
-  "shape": svgSquare
-}, {
-  "name": "",
-  "level": "red",
-  "type": "red",
-  "label": "Critical",
-  "trans": 10,
-  "shape": svgSquare
-}]
+var legend = [
+  {
+    name: "",
+    level: "seagreen",
+    type: "seagreen",
+    label: "Normal",
+    trans: 8,
+    shape: svgSquare
+  },
+  {
+    name: "",
+    level: "orange",
+    type: "orange",
+    label: "Warning",
+    trans: 9,
+    shape: svgSquare
+  },
+  {
+    name: "",
+    level: "red",
+    type: "red",
+    label: "Critical",
+    trans: 10,
+    shape: svgSquare
+  }
+];
 
 var legendButton = {
-  "name": "Sodi",
-  "level": "grey",
-  "type": "grey",
-  "trans": 8,
-  "shape": svgSquare
-}
+  name: "",
+  level: "grey",
+  type: "grey",
+  trans: 8,
+  shape: svgSquare
+};
 
 var boundEvent;
 
@@ -74,6 +81,16 @@ export default class Tree extends React.Component {
     this.state = {
       initialRender: true,
       data: this.assignInternalProperties(clone(props.data)),
+
+      detailsPane: {
+        visible: false,
+        data: {}
+      },
+
+      detailsPage: {
+        visible: false,
+        data: {}
+      }
     };
     this.findNodesById = this.findNodesById.bind(this);
     this.collapseNode = this.collapseNode.bind(this);
@@ -81,25 +98,36 @@ export default class Tree extends React.Component {
     this.handleOnClickCb = this.handleOnClickCb.bind(this);
     this.handleMouseOver = this.handleMouseOver.bind(this);
 
+    this.handleNodeClick = this.handleNodeClick.bind(this);
+    this.openDetailsPane = this.openDetailsPane.bind(this);
+    this.closeDetailsPane = this.closeDetailsPane.bind(this);
+    this.openDetailsPage = this.openDetailsPage.bind(this);
+    this.closeDetailsPage = this.closeDetailsPage.bind(this);
+
     window.treeComponent = this;
     window.tipAvailable = true;
-
   }
 
   zoomOutTree() {
-    const svg = select('.rd3t-svg');
-    const g = select('.rd3t-g');
+    const svg = select(".rd3t-svg");
+    const g = select(".rd3t-g");
     svg.call(boundEvent.event);
     boundEvent.scale(boundEvent.scale() - 0.2);
-    svg.transition().duration(550).call(boundEvent.event);
+    svg
+      .transition()
+      .duration(550)
+      .call(boundEvent.event);
   }
 
   zoomInTree() {
-    const svg = select('.rd3t-svg');
-    const g = select('.rd3t-g');
+    const svg = select(".rd3t-svg");
+    const g = select(".rd3t-g");
     svg.call(boundEvent.event);
     boundEvent.scale(boundEvent.scale() + 0.2);
-    svg.transition().duration(550).call(boundEvent.event);
+    svg
+      .transition()
+      .duration(550)
+      .call(boundEvent.event);
   }
 
   componentDidMount() {
@@ -112,14 +140,13 @@ export default class Tree extends React.Component {
 
     select(".linkBase").attr("marker-end", "url(#arrow)");
     //test
-
   }
 
   componentWillReceiveProps(nextProps) {
     // Clone new data & assign internal properties
     if (!deepEqual(this.props.data, nextProps.data)) {
       this.setState({
-        data: this.assignInternalProperties(clone(nextProps.data)),
+        data: this.assignInternalProperties(clone(nextProps.data))
       });
     }
 
@@ -156,20 +183,21 @@ export default class Tree extends React.Component {
   bindZoomListener(props) {
     const { zoomable, scaleExtent, translate } = props;
     boundEvent = behavior
-                  .zoom()
-                  .scaleExtent([scaleExtent.min, scaleExtent.max])
-                  .on('zoom', () => {
-                    g.attr('transform', `translate(${event.translate}) scale(${event.scale})`);
-                  })
-                  // Offset so that first pan and zoom does not jump back to [0,0] coords
-                  .translate([translate.x, translate.y])
-    const svg = select('.rd3t-svg');
-    const g = select('.rd3t-g');
+      .zoom()
+      .scaleExtent([scaleExtent.min, scaleExtent.max])
+      .on("zoom", () => {
+        g.attr(
+          "transform",
+          `translate(${event.translate}) scale(${event.scale})`
+        );
+      })
+      // Offset so that first pan and zoom does not jump back to [0,0] coords
+      .translate([translate.x, translate.y]);
+    const svg = select(".rd3t-svg");
+    const g = select(".rd3t-g");
 
     if (zoomable) {
-      svg.call(
-        boundEvent
-      );
+      svg.call(boundEvent);
     }
   }
 
@@ -253,6 +281,7 @@ export default class Tree extends React.Component {
   }
 
   /**
+   * TODO: Remove this function
    * handleNodeToggle - Finds the node matching `nodeId` and
    * expands/collapses it, depending on the current state of
    * its `_collapsed` property.
@@ -269,12 +298,14 @@ export default class Tree extends React.Component {
     const targetNode = matches[0];
 
     window.tipAvailable = false;
-    let tipPermission = setTimeout(()=>{
+    let tipPermission = setTimeout(() => {
       window.tipAvailable = true;
     }, 700);
 
     if (this.props.collapsible) {
-      targetNode._collapsed ? this.expandNode(targetNode) : this.collapseNode(targetNode);
+      targetNode._collapsed
+        ? this.expandNode(targetNode)
+        : this.collapseNode(targetNode);
       this.setState({ data }, () => this.handleOnClickCb(targetNode));
     } else {
       this.handleOnClickCb(targetNode);
@@ -285,19 +316,22 @@ export default class Tree extends React.Component {
     const data = clone(this.state.data);
     const matches = this.findNodesById(nodeId, data, []);
     const targetNode = matches[0];
-    tip = d3.tip().attr('class', 'd3-tip').html(function (d) {
-      return d.attributes &&
-        Object.keys(this.props.attributes).map(labelKey => (
-          <tspan x={textLayout.x} key={uuid.v4()}>
-            {labelKey + ' : ' + this.props.attributes[labelKey]}
-          </tspan>
-        ))
-    });
+    tip = d3
+      .tip()
+      .attr("class", "d3-tip")
+      .html(function(d) {
+        return (
+          d.attributes &&
+          Object.keys(this.props.attributes).map(labelKey => (
+            <tspan x={textLayout.x} key={uuid.v4()}>
+              {labelKey + " : " + this.props.attributes[labelKey]}
+            </tspan>
+          ))
+        );
+      });
   }
 
-  handleMouseOut(attrs) {
-
-  }
+  handleMouseOut(attrs) {}
 
   /**
    * handleOnClickCb - Handles the user-defined `onClick` function
@@ -308,9 +342,74 @@ export default class Tree extends React.Component {
    */
   handleOnClickCb(targetNode) {
     const { onClick } = this.props;
-    if (onClick && typeof onClick === 'function') {
+    if (onClick && typeof onClick === "function") {
       onClick(clone(targetNode));
     }
+  }
+
+  /**
+   * Handles the event when user clicks a node
+   */
+  handleNodeClick(nodeId) {
+    const data = clone(this.state.data);
+    const matches = this.findNodesById(nodeId, data, []);
+    const targetNode = matches[0];
+    this.openDetailsPane(targetNode);
+  }
+
+
+   /**
+   * Opens a Right panel with data of clicked node
+   */
+  openDetailsPane(nodeData) {
+    this.setState({
+      detailsPane: {
+        visible: true,
+        data: nodeData
+      }
+    });
+   // this.openDetailsPage(nodeData);
+  }
+
+ /**
+   * Closes a right panel
+   */
+  closeDetailsPane() {
+    
+    this.setState({
+      detailsPane: {
+        visible: false,
+        data : {}
+       
+      }
+    });
+  }
+
+   /**
+   * Opens a details page with data (more details) of clicked node
+   */
+  openDetailsPage(nodeData) {
+   console.log("open deatails")
+   console.log(nodeData)
+    this.setState({
+      detailsPage: {
+        visible: true,
+        data: nodeData
+      }
+    });
+  }
+
+   /**
+   * Closes details page
+   */
+  closeDetailsPage() {
+
+    this.setState({
+      detailsPage: {
+        visible: false,
+         data:{}
+      }
+    });
   }
 
   /**
@@ -322,19 +421,31 @@ export default class Tree extends React.Component {
    * @return {object} Object containing `nodes` and `links`.
    */
   generateTree() {
-    if(this.props.data.length == 0) {
-      const nodes = [] ;
+    if (this.props.data.length == 0) {
+      const nodes = [];
       const links = [];
-      return { nodes , links };
+      return { nodes, links };
     }
-    const { initialDepth, depthFactor, separation, nodeSize, orientation } = this.props;
+    const {
+      initialDepth,
+      depthFactor,
+      separation,
+      nodeSize,
+      orientation
+    } = this.props;
 
     const tree = layout
       .tree()
-      .nodeSize(orientation === 'horizontal' ? [nodeSize.y - 25, nodeSize.x] : [nodeSize.x - 25, nodeSize.y])
-      .separation(
-      (a, b) => (deepEqual(a.parent, b.parent) ? separation.siblings : separation.nonSiblings),
-    )
+      .nodeSize(
+        orientation === "horizontal"
+          ? [nodeSize.y - 25, nodeSize.x]
+          : [nodeSize.x - 25, nodeSize.y]
+      )
+      .separation((a, b) =>
+        deepEqual(a.parent, b.parent)
+          ? separation.siblings
+          : separation.nonSiblings
+      )
       .children(d => (d._collapsed ? null : d._children));
 
     const rootNode = this.state.data[0];
@@ -370,86 +481,135 @@ export default class Tree extends React.Component {
       initialDepth,
       separation,
       circleRadius,
-      styles,
+      styles
     } = this.props;
 
-    const subscriptions = { ...nodeSize, ...separation, depthFactor, initialDepth };
+    const subscriptions = {
+      ...nodeSize,
+      ...separation,
+      depthFactor,
+      initialDepth
+    };
 
-    const windowHeight = parseFloat(window.innerHeight)/2;
-    const windowWidth = parseFloat(window.innerWidth)/2 - 80;
+    const windowHeight = parseFloat(window.innerHeight) / 2;
+    const windowWidth = parseFloat(window.innerWidth) / 2 - 80;
 
     // alert(windowHeight + " : " + windowWidth)
 
-    if(nodes.length == 0) {
-      return(
-        <div className={`rd3t-tree-container ${zoomable ? 'rd3t-grabbable' : undefined}`}>
+    if (nodes.length == 0) {
+      return (
+        <div
+          className={`rd3t-tree-container ${
+            zoomable ? "rd3t-grabbable" : undefined
+          }`}
+        >
           <svg width="100%" height="100%">
-
-            <text x={windowWidth} y={windowHeight} font-family="sans-serif" font-size="20px" fill="grey">
+            <text
+              x={windowWidth}
+              y={windowHeight}
+              font-family="sans-serif"
+              font-size="20px"
+              fill="grey"
+            >
               Tree View is not available
+            </text>
+            <text
+              x={windowWidth - 37}
+              y={windowHeight + 30}
+              font-family="sans-serif"
+              font-size="19px"
+              fill="grey"
+            >
+              (Add Endpoints To This Application)
             </text>
           </svg>
         </div>
-      )
+      );
     }
 
     return (
-      <div className={`rd3t-tree-container ${zoomable ? 'rd3t-grabbable' : undefined}`}>
-        <svg className="rd3t-svg" width="100%" height="80%">
-
-        <defs>
-          <marker
-            id="arrow"
-            markerUnits="strokeWidth"
-            markerWidth="8"
-            markerHeight="8"
-            viewBox="0 0 12 12"
-            refX="6"
-            refY="6"
-            orient="auto">
-              <path d="M 0 0 12 6 0 12 0 3" style={{fill : "rgb(54, 126, 233)"}} />
-          </marker>
-        </defs>
-          <TransitionGroup
-            component="g"
-            className="rd3t-g"
-            transform={`translate(${translate.x},${translate.y})`}
-          >
-
-            {links.map(linkData => (
-              <Link
-                key={uuid.v4()}
-                orientation={orientation}
-                pathFunc={pathFunc}
-                linkData={linkData}
-                transitionDuration={transitionDuration}
-                styles={styles.links}
-              />
+      <div>
+        <div
+          className={`rd3t-tree-container ${
+            zoomable ? "rd3t-grabbable" : undefined
+          }`}
+        >
+          <svg className="rd3t-svg" width="100%" height="80%">
+            <defs>
+              <marker
+                id="arrow"
+                markerUnits="strokeWidth"
+                markerWidth="8"
+                markerHeight="8"
+                viewBox="0 0 12 12"
+                refX="6"
+                refY="6"
+                orient="auto"
+              >
+                <path
+                  d="M 0 0 12 6 0 12 0 3"
+                  style={{ fill: "rgb(54, 126, 233)" }}
+                />
+              </marker>
+            </defs>
+            <TransitionGroup
+              component="g"
+              className="rd3t-g"
+              transform={`translate(${translate.x},${translate.y})`}
+            >
+              {links.map(linkData => (
+                <Link
+                  key={uuid.v4()}
+                  orientation={orientation}
+                  pathFunc={pathFunc}
+                  linkData={linkData}
+                  transitionDuration={transitionDuration}
+                  styles={styles.links}
+                />
               ))}
 
-            {nodes.map(nodeData => (
-              <Node
-                key={nodeData.id}
-                nodeSvgShape={nodeSvgShape}
-                orientation={orientation}
-                transitionDuration={transitionDuration}
-                nodeData={nodeData}
-                name={nodeData.name}
-                sub_label={nodeData.sub_label}
-                fraction={nodeData.fraction}
-                totalUnmapped={nodeData.totalUnmapped}
-                label={nodeData.label}
-                attributes={nodeData.attributes}
-                onClick={this.handleNodeToggle}
-                textLayout={textLayout}
-                circleRadius={circleRadius}
-                subscriptions={subscriptions}
-                styles={styles.nodes}
-              />
+              {nodes.map(nodeData => (
+                <Node
+                  key={nodeData.id}
+                  nodeSvgShape={nodeSvgShape}
+                  orientation={orientation}
+                  transitionDuration={transitionDuration}
+                  nodeData={nodeData}
+                  name={nodeData.name}
+                  sub_label={nodeData.sub_label}
+                  fraction={nodeData.fraction}
+                  totalUnmapped={nodeData.totalUnmapped}
+                  label={nodeData.label}
+                  attributes={nodeData.attributes}
+                  // onClick={this.handleNodeToggle}
+                  onClick={this.handleNodeClick}
+                  closeDetailsPane={this.closeDetailsPane}
+                  textLayout={textLayout}
+                  circleRadius={circleRadius}
+                  subscriptions={subscriptions}
+                  styles={styles.nodes}
+                />
+              ))}
+            </TransitionGroup>
+          </svg>
+        </div>
 
-            ))}
-          </TransitionGroup>
-        </svg>
+        <div>
+          {this.state.detailsPane.visible ? (
+            <DetailsPane
+              closeDetailsPane={this.closeDetailsPane}
+              openDetailsPage={this.openDetailsPage}
+              data={this.state.detailsPane.data}
+            />
+          ) : null}
+
+          {this.state.detailsPage.visible ? (
+            <DetailsPage
+              data = {this.state.detailsPage.data}
+              closeDetailsPage={this.closeDetailsPage}
+            />
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -457,15 +617,15 @@ export default class Tree extends React.Component {
 
 Tree.defaultProps = {
   nodeSvgShape: {
-    shape: 'circle',
+    shape: "circle",
     shapeProps: {
-      r: 10,
-    },
+      r: 10
+    }
   },
   onClick: undefined,
-  orientation: 'horizontal',
+  orientation: "horizontal",
   translate: { x: 0, y: 0 },
-  pathFunc: 'diagonal',
+  pathFunc: "diagonal",
   transitionDuration: 500,
   depthFactor: undefined,
   collapsible: true,
@@ -475,30 +635,30 @@ Tree.defaultProps = {
   nodeSize: { x: 140, y: 140 },
   separation: { siblings: 0.9, nonSiblings: 1 },
   textLayout: {
-    textAnchor: 'start',
+    textAnchor: "start",
     x: 10,
     y: -10,
-    transform: undefined,
+    transform: undefined
   },
   circleRadius: undefined, // TODO: DEPRECATE
-  styles: {},
+  styles: {}
 };
 
 Tree.propTypes = {
   data: PropTypes.array.isRequired,
   nodeSvgShape: PropTypes.shape({
     shape: PropTypes.string,
-    shapeProps: PropTypes.object,
+    shapeProps: PropTypes.object
   }),
   onClick: PropTypes.func,
-  orientation: PropTypes.oneOf(['horizontal', 'vertical']),
+  orientation: PropTypes.oneOf(["horizontal", "vertical"]),
   translate: PropTypes.shape({
     x: PropTypes.number,
-    y: PropTypes.number,
+    y: PropTypes.number
   }),
   pathFunc: PropTypes.oneOfType([
-    PropTypes.oneOf(['diagonal', 'elbow', 'straight']),
-    PropTypes.func,
+    PropTypes.oneOf(["diagonal", "elbow", "straight"]),
+    PropTypes.func
   ]),
   transitionDuration: PropTypes.number,
   depthFactor: PropTypes.number,
@@ -507,20 +667,20 @@ Tree.propTypes = {
   zoomable: PropTypes.bool,
   scaleExtent: PropTypes.shape({
     min: PropTypes.number,
-    max: PropTypes.number,
+    max: PropTypes.number
   }),
   nodeSize: PropTypes.shape({
     x: PropTypes.number,
-    y: PropTypes.number,
+    y: PropTypes.number
   }),
   separation: PropTypes.shape({
     siblings: PropTypes.number,
-    nonSiblings: PropTypes.number,
+    nonSiblings: PropTypes.number
   }),
   textLayout: PropTypes.object,
   circleRadius: PropTypes.number,
   styles: PropTypes.shape({
     nodes: PropTypes.object,
-    links: PropTypes.object,
-  }),
+    links: PropTypes.object
+  })
 };
