@@ -2,9 +2,9 @@
 
 <head>
     <Title>AppD</Title>
-    <!-- <link rel="stylesheet" id="champion-fontawesome-css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css" media="all"> -->
+    <!-- <link rel="stylesheet" id="champion-fontawesome-css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" type="text/css" media="all"> 
     <link rel="stylesheet" href="icomoon/demo-files/demo.css" />
-    <link rel="stylesheet" href="icomoon/style.css" />
+    <link rel="stylesheet" href="icomoon/style.css" />-->
 </head>
 
 <body>
@@ -15,8 +15,8 @@
                 var tokenObj = Ext.decode(e.data, true);
                 if (tokenObj) {
                     // Setting the cookie with the tokens received by the APIC
-                    Ext.util.Cookies.set('app_Cisco_AppIQ_token', tokenObj.token);
-                    Ext.util.Cookies.set('app_Cisco_AppIQ_urlToken', tokenObj.urlToken);
+                    Ext.util.Cookies.set('app_Cisco_TestAppIQ_token', tokenObj.token);
+                    Ext.util.Cookies.set('app_Cisco_TestAppIQ_urlToken', tokenObj.urlToken);
                     console.log('Tokens set')
                 }
             }
