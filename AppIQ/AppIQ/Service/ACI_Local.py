@@ -16,7 +16,7 @@ except:
 #
 #
 def createCertSession():
-    certUser = 'Cisco_AppIQ'  # vendor_appname
+    certUser = 'Cisco_TestAppIQ'  # vendor_appname
     pKeyFile = '/home/app/credentials/plugin.key'  # static generated upon install
 #
     polUni = PolUni('')
@@ -48,6 +48,7 @@ class ACI_Local(object):
             self.epg_url =  self.proto + self.apic_ip + '/api/class/fvAEPg.json'
             self.ep_url =  self.proto + self.apic_ip + '/api/class/fvCEp.json'
         else:
+
             current_app.logger.info('Could not connect to APIC. Please verify your APIC connection.')
         # self.apic_token = self.apic_login()
         #self.apic_token = self.login()
@@ -63,7 +64,7 @@ class ACI_Local(object):
         user_cert, p_key_str = createCertSession()
         session = requests.session()
         uri = "/api/requestAppToken.json"
-        app_token_payload = {"aaaAppToken": {"attributes": {"appName": "Cisco_AppIQ"}}}
+        app_token_payload = {"aaaAppToken": {"attributes": {"appName": "Cisco_TestAppIQ"}}}
         data = json.dumps(app_token_payload)
         payLoad = "POST" + uri + data
         p_key = load_privatekey(FILETYPE_PEM, p_key_str)
@@ -108,6 +109,35 @@ class ACI_Local(object):
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: Could not connect to APIC database. Error: "+str(e)})
 
 
+    def get_mo_related_item(self, mo_dn, item_query_string, item_type):
+        try:
+            if item_type == "":
+                mo_related_item_url = self.proto + self.apic_ip + "/api/node/mo/" + mo_dn + ".json?" + item_query_string
+            elif item_type == "HealthRecords":
+                mo_related_item_url = self.proto + self.apic_ip + "/api/node/class/healthRecord.json?query-target-filter=eq(healthRecord.affected,\"" + mo_dn + "\")"
+            elif item_type == "ifConnRecords":
+                mo_related_item_url = self.proto + self.apic_ip + "/api/node/mo/uni/epp/fv-[" + mo_dn + "].json?" + item_query_string
+            
+            mo_related_item_resp = self.ACI_get(mo_related_item_url, cookie = {'APIC-Cookie': self.apic_token})
+            mo_related_item_list = ((json.loads(mo_related_item_resp.text)['imdata']))
+            return mo_related_item_list
+            # return {"status": True, "payload": mo_related_item_list}
+        except Exception as ex:
+            current_app.logger.info('Exception while fetching EPG item with query string: ' + item_query_string + ',\nError:' + str(ex))
+            current_app.logger.info('Epg Item Url : =>' + mo_related_item_url)
+            return []
+            # return {"status": False, "payload": []}
+
+    def get_all_mo_instances(self, mo_class):
+        try:
+            mo_url = self.proto + self.apic_ip + "/api/node/class/" + mo_class + ".json"
+            mo_resp = self.ACI_get(mo_url, cookie = {'APIC-Cookie': self.apic_token})
+            mo_instance_list = ((json.loads(mo_resp.text)['imdata']))
+            return {"status": True, "payload": mo_instance_list}
+        except Exception as ex:
+            current_app.logger.info('Exception while fetching MO: ' + mo_class + ', Error:' + str(ex))
+            return {"status": False, "payload": []}
+
     def get_epg_health(self,tenant,app_profile,epg_name,apic_token=None):
         try:
             epg_health_url = self.proto+self.apic_ip +"/api/node/mo/uni/tn-"+str(tenant)+"/ap-"+app_profile+"/epg-"+epg_name+".json?rsp-subtree-include=health,no-scoped"
@@ -122,8 +152,7 @@ class ACI_Local(object):
             current_app.logger.info('Exception in EPG health API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve EPG Health. Error: "+str(e)})
 
-#
-#
+
     def apic_fetchEPData(self, tenant,apic_token=None):
         try:
             # ep_url = "https://"+self.apic+"/api/class/fvCEp.json?query-target-filter=wcard(fvCEp.dn,"AppDynamics/")"
@@ -248,6 +277,9 @@ class ACI_Local(object):
         try:
             current_app.logger.info('Parsing APIC Data!')
             ep_list = []
+            
+            current_app.logger.info("")
+
             for ep in ep_resp:
                 #current_app.logger.info('EP Name:'+str(ep['fvCEp']['attributes']['name']))
                 ep_attr = ep['fvCEp']['attributes']
@@ -264,6 +296,7 @@ class ACI_Local(object):
 
                     string = str(ep_attr['dn'])
                     bdString = string.split("/", 5)
+
                     newbdString = bdString[0] + '/' + bdString[1] + '/' + bdString[2] + '/' + bdString[3]
                     bd_data = self.apic_fetchBD(newbdString,apic_token=apic_token)
                     newvrfString = bdString[0] + '/' + bdString[1] + '/BD-' + bd_data
@@ -292,14 +325,18 @@ class ACI_Local(object):
                             path_list.append(str(child['fvRsCEpToPathEp']['attributes']['tDn']))
                         if str(child.keys()[0]) == 'fvRsToVm':
                             tDn_dom = str(child['fvRsToVm']['attributes']['tDn'])
+                            
                             vmmDom = str(tDn_dom.split("ctrlr-[")[1].split(']-')[0])
+                            
                             # vmmDom = str(tDn_dom.split("/")[1].split("-")[1]) + "/" + str(tDn_dom.split("/")[2].split("-")[2])
                             ep_dict.update({'VMM-Domain': vmmDom})
                             tDn = str(child['fvRsToVm']['attributes']['tDn'])
                             vm_url = self.proto + self.apic_ip + '/api/mo/' + tDn + '.json'
                             # vm_response = requests.get(vm_url, cookies={'APIC-Cookie': token})
                             vm_response = self.ACI_get(vm_url,cookie={'APIC-Cookie': apic_token})
+
                             vm_name = json.loads(vm_response.text)['imdata'][0]['compVm']['attributes']['name']
+
                             if not vm_name:
                                 vm_name = 'EP-'+str(ep['fvCEp']['attributes']['name'])
                             ep_dict.update({'VM-Name': str(vm_name)})

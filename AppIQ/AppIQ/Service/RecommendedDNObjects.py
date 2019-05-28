@@ -11,7 +11,7 @@ from flask import current_app
 
 class Recommend(object):
 
-    # Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps
+    # Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps dicts
     def getCommonEPs(self, appd_ip_list, aci_parsed_eps):
         common_list = []
         for each in aci_parsed_eps:
@@ -24,6 +24,18 @@ class Recommend(object):
         epg = dn.split('/')[3].split('-',1)[1]
         return ap,epg
 
+    # count_dict Example
+    # count_dict = 
+    # {
+    #     "ap1": {
+    #         "epg11":2,
+    #         "epg12":3
+    #     },
+    #     "ap2": {
+    #         "epg21":3,
+    #         "epg22":1
+    #     }
+    # }
     def extract_ap_and_epgs(self,eps):
         count_dict = {}
         for ep in eps:
@@ -36,6 +48,7 @@ class Recommend(object):
                 count_dict[ap][epg] += 1
         return count_dict
 
+    # returns a list of list
     def determine_recommendation(self,extract_ap_epgs,common_eps):
         ip2_list = []
         for each in common_eps:
@@ -56,7 +69,7 @@ class Recommend(object):
                     elif main_count == dup_count:
                         ap_main_c = len(extract_ap_epgs[ap_main])
                         ap_dup_c = len(extract_ap_epgs[ap_dup])
-                        # Add one with hi
+                        # Add one with more number of Epgs
                         if ap_main_c > ap_dup_c:
                             ip2_list.append([each['IP'],each['dn'],'Yes'])
                             break
@@ -79,6 +92,35 @@ class Recommend(object):
                     ip2_list.remove(b)
         return ip2_list
 
+    # Sample Return Value
+    # [
+    #     {
+    #         "ipaddress": "1.1.1.1",
+    #         "domains": [
+    #             {
+    #                 "domainName": "dn of epg1",
+    #                 "recommended": True
+    #             },
+    #             {
+    #                 "domainName": "dn of epg2",
+    #                 "recommended": False
+    #             }
+    #         ]
+    #     },
+    #     {
+    #         "ipaddress": "2.2.2.2",
+    #         "domains": [
+    #             {
+    #                 "domainName": "dn of epg3",
+    #                 "recommended": True
+    #             },
+    #             {
+    #                 "domainName": "dn of epg4",
+    #                 "recommended": False
+    #             }
+    #         ]
+    #     }
+    # ]
     def generatelist(self,ipList):
         src_clus_list = []
         ips = []
@@ -123,10 +165,14 @@ class Recommend(object):
             return []
         # end_points = aci_object.apic_fetchEPData(tenant)
         # parsed_eps = aci_object.parseEPsforTemp(end_points, tenant)
+        
+        # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test/cep-00:50:56:92:BA:4A/ip-[20.20.20.10]"
         if not parsed_eps:
             return []
         for each in parsed_eps:
             splitdn = '/'.join(each['dn'].split('/',4)[0:4])
+            # Example of extracted Epg dn
+            # uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test
             each['dn'] = splitdn
         try:
             common_eps = self.getCommonEPs(ip_list, parsed_eps)

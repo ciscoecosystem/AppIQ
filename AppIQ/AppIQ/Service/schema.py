@@ -5,7 +5,6 @@ import graphene
 # import sqlite3
 import plugin_server as app
 
-
 class Check(graphene.ObjectType):
     checkpoint = graphene.String()
 
@@ -25,6 +24,20 @@ class Mapping(graphene.ObjectType):
 
 class SaveMapping(graphene.ObjectType):
     savemapping = graphene.String()
+
+
+class GetFaults(graphene.ObjectType):
+    faultsList = graphene.String()
+
+class GetEvents(graphene.ObjectType):
+    eventsList = graphene.String()
+
+class GetAuditLogs(graphene.ObjectType):
+    auditLogsList = graphene.String()
+
+class SetPollingInterval(graphene.ObjectType):
+    status = graphene.String()
+    message = graphene.String()
 
 
 class Run(graphene.ObjectType):
@@ -48,9 +61,34 @@ class Query(graphene.ObjectType):
     SaveMapping = graphene.Field(SaveMapping, appId=graphene.String(),tn=graphene.String(),
                                  data=graphene.String())  # data can be a list or string.. Check!
     Run = graphene.Field(Run, tn=graphene.String(), appId=graphene.String())
+
+    GetFaults = graphene.Field(GetFaults, dn=graphene.String())
+    GetEvents = graphene.Field(GetEvents, dn=graphene.String())
+    GetAuditLogs = graphene.Field(GetAuditLogs, dn=graphene.String())
+    SetPollingInterval = graphene.Field(SetPollingInterval, interval = graphene.String())
+
     # EnableView = graphene.Field(EnableView,view=graphene.String())
     Details = graphene.Field(Details, tn=graphene.String(), appId=graphene.String())
 
+    def resolve_GetFaults(self, info, dn):
+        GetFaults.faultsList = app.getFaults(dn)
+        return GetFaults
+
+    def resolve_GetEvents(self, info, dn):
+        GetEvents.eventsList = app.getEvents(dn)
+        return GetEvents
+
+    def resolve_GetAuditLogs(self, info, dn):
+        GetAuditLogs.auditLogsList = app.getAuditLogs(dn)
+        return GetAuditLogs
+
+    def resolve_SetPollingInterval(self, info, interval):
+        status, message = app.setPollingInterval(interval)
+        SetPollingInterval.status = status
+        SetPollingInterval.message = message
+        return SetPollingInterval
+
+    
     def resolve_Check(self,info): #On APIC
     #def resolve_Check(self, args, context, info):  # On local desktop
         Check.checkpoint = app.checkFile()

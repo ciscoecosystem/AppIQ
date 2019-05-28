@@ -3,12 +3,15 @@ from flask import current_app
 
 __author__ = 'nilayshah'
 
-from sqlalchemy import Column, Integer, String, ForeignKey, PickleType, update, Boolean, func
+from sqlalchemy import Column, Integer, String, ForeignKey, PickleType, update, Boolean, func, DateTime
 from sqlalchemy import create_engine
+
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import backref, mapper, relation, sessionmaker, relationship
 from sqlalchemy.ext import mutable
+from sqlalchemy import exists
 import sqlalchemy.types as types
+import datetime
 import time, json
 
 # app.debug = True
@@ -20,12 +23,14 @@ class Application(Base):
     appId = Column(Integer, primary_key=True)
     appName = Column(String)
     appMetrics = Column(PickleType)  # https://stackoverflow.com/questions/1378325/python-dicts-in-sqlalchemy
+    timestamp = Column(DateTime)
     isViewEnabled = Column(Boolean, nullable=False)
 
-    def __init__(self, appId, appName, appMetrics, isViewEnabled=None):
+    def __init__(self, appId, appName, appMetrics, timestamp, isViewEnabled=None):
         self.appId = appId
         self.appName = appName
         self.appMetrics = appMetrics
+        self.timestamp = timestamp
         if isViewEnabled != None:
             self.isViewEnabled = isViewEnabled
         else:
@@ -38,29 +43,32 @@ class Tiers(Base):
     tierName = Column(String)
     appId = Column(Integer, ForeignKey('Application.appId'))
     tierHealth = Column(String)
+    timestamp = Column(DateTime)
     sepchild = relationship('ServiceEndpoints', primaryjoin='Tiers.tierId==ServiceEndpoints.tierId', backref='Tiers')
     hevchild = relationship('HealthViolations', primaryjoin='Tiers.tierId==HealthViolations.tierId', backref='Tiers')
 
-    def __init__(self, tierId, tierName, appId, tierHealth):
+    def __init__(self, tierId, tierName, appId, tierHealth, timestamp):
         self.tierId = tierId
         self.tierName = tierName
         self.appId = appId
         self.tierHealth = tierHealth
+        self.tierHealth = timestamp
 
 
 class ServiceEndpoints(Base):
     __tablename__ = 'ServiceEndpoints'
     sepId = Column(Integer, primary_key=True)
-    sep = Column(
-        PickleType)  # List of serialized json #https://stackoverflow.com/questions/1378325/python-dicts-in-sqlalchemy
+    sep = Column(PickleType)  # List of serialized json #https://stackoverflow.com/questions/1378325/python-dicts-in-sqlalchemy
+    timestamp = Column(DateTime)
     tierId = Column(Integer, ForeignKey('Tiers.tierId'))
     appId = Column(Integer, ForeignKey('Application.appId'))
 
-    def __init__(self, sepId, sep, tierId, appId):
+    def __init__(self, sepId, sep, tierId, appId, timestamp):
         self.sepId = sepId
         self.sep = sep
         self.tierId = tierId
         self.appId = appId
+        self.timestamp = timestamp
 
 
 class HealthViolations(Base):
@@ -70,10 +78,11 @@ class HealthViolations(Base):
     businessTransaction = Column(String)
     description = Column(String)
     severity = Column(String)
+    timestamp = Column(DateTime)
     tierId = Column(Integer, ForeignKey('Tiers.tierId'))
     appId = Column(Integer, ForeignKey('Application.appId'))
     # violationId, startTime, businessTransaction,description,severity,tierId,appId
-    def __init__(self, violationId, startTime, businessTransaction, description, severity, tierId, appId):
+    def __init__(self, violationId, startTime, businessTransaction, description, severity, tierId, appId, timestamp):
         self.violationId = violationId
         self.startTime = startTime
         self.businessTransaction = businessTransaction
@@ -81,6 +90,7 @@ class HealthViolations(Base):
         self.severity = severity
         self.tierId = tierId
         self.appId = appId
+        self.timestamp = timestamp
 
 
 class Nodes(Base):
@@ -90,16 +100,92 @@ class Nodes(Base):
     tierId = Column(Integer, ForeignKey('Tiers.tierId'))
     nodeHealth = Column(String)
     ipAddress = Column(PickleType)
+    timestamp = Column(DateTime)
     appId = Column(Integer, ForeignKey('Application.appId'))
 
-    def __init__(self, nodeId, nodeName, tierId, nodeHealth, ipList, appId):
+    def __init__(self, nodeId, nodeName, tierId, nodeHealth, ipList, appId, timestamp):
         self.nodeId = nodeId
         self.nodeName = nodeName
         self.tierId = tierId
         self.nodeHealth = nodeHealth
         self.ipAddress = ipList
         self.appId = appId
+        self.timestamp = timestamp
 
+
+class EpgHistory(Base):
+    __tablename__ = 'EpgHistory'
+    epgDn = Column(String, primary_key=True)
+    epgFaultRecords = Column(PickleType)
+    epgHealthRecords = Column(PickleType)
+    epgEventRecords = Column(PickleType)
+    epgLogRecords = Column(PickleType)
+    timestamp = Column(DateTime)
+
+    def __init__(self, epgDn, epgFaultRecords, epgHealthRecords, epgEventRecords, epgLogRecords, timestamp):
+        self.epgDn = epgDn
+        self.epgFaultRecords = epgFaultRecords
+        self.epgHealthRecords = epgHealthRecords
+        self.epgEventRecords = epgEventRecords
+        self.epgLogRecords = epgLogRecords
+        self.timestamp = timestamp
+
+class EpgSummary(Base):
+    __tablename__ = 'EpgSummary'
+    epgDn = Column(String, primary_key=True)
+    epgDomains = Column(PickleType)
+    epgSubnets = Column(PickleType)
+    epgStaticEps = Column(PickleType)
+    epgStaticLeaves = Column(PickleType)
+    epgFcPaths = Column(PickleType)
+    epgStaticPorts = Column(PickleType)
+    epgIfConns = Column(PickleType)
+    epgContracts = Column(PickleType)
+    epgLabels = Column(PickleType)
+    timestamp = Column(DateTime)
+
+    def __init__(self, epgDn, epgDomains, epgSubnets, epgStaticEps, epgStaticLeaves, epgFcPaths, epgStaticPorts, epgIfConns, epgContracts, epgLabels, timestamp):
+        self.epgDn = epgDn
+        self.epgDomains = epgDomains
+        self.epgSubnets = epgSubnets
+        self.epgStaticEps = epgStaticEps
+        self.epgStaticLeaves = epgStaticLeaves
+        self.epgFcPaths = epgFcPaths
+        self.epgStaticPorts = epgStaticPorts
+        self.epgIfConns = epgIfConns
+        self.epgContracts = epgContracts
+        self.epgLabels = epgLabels
+        self.timestamp = timestamp
+
+class ApHistory(Base):
+    __tablename__ = 'ApHistory'
+    apDn = Column(String, primary_key=True)
+    apFaultRecords = Column(PickleType)
+    apHealthRecords = Column(PickleType)
+    apEventRecords = Column(PickleType)
+    apLogRecords = Column(PickleType)
+    timestamp = Column(DateTime)
+
+    def __init__(self, apDn, apFaultRecords, apHealthRecords, apEventRecords, apLogRecords, timestamp):
+        self.apDn = apDn
+        self.apFaultRecords = apFaultRecords
+        self.apHealthRecords = apHealthRecords
+        self.apEventRecords = apEventRecords
+        self.apLogRecords = apLogRecords
+        self.timestamp = timestamp
+
+class ApSummary(Base):
+    __tablename__ = 'ApSummary'
+    apDn = Column(String, primary_key=True)
+    apEpgs = Column(PickleType)
+    apUsegEpgs = Column(PickleType)
+    timestamp = Column(DateTime)
+
+    def __init__(self, apDn, apEpgs, apUsegEpgs, timestamp):
+        self.apDn = apDn
+        self.apEpgs = apEpgs
+        self.apUsegEpgs = apUsegEpgs
+        self.timestamp = timestamp
 
 class ACItemp(Base):
     # ACI temp gets all EPs in APIC for all tenants, UI will request based on tenant and get EPs for that tenant
@@ -147,12 +233,18 @@ class Mapping(Base):
 class Database():
     def __init__(self):
         self.engine = create_engine("sqlite:///AppD_Test.db?check_same_thread=False")
+
         # get a handle on the table object
         # self.Application_table = Application.__table__
         # get a handle on the metadata
         self.metadata = Base.metadata
         Session = sessionmaker(bind=self.engine)
         self.conn = self.engine.connect()
+        try:
+            self.conn.execute("PRAGMA journal_mode = WAL")
+        except Exception as ex:
+            current_app.logger.info("Exception setting journal mode to WAL : " + str(ex))
+        
         self.session = Session(bind=self.conn)
 
     def createTables(self):  # Add Exception
@@ -189,25 +281,25 @@ class Database():
 
             if table == 'Application':
                 # appId, appName, appMetrics
-                self.session.add(Application(data[0], str(data[1]), data[2]))
+                self.session.add(Application(data[0], str(data[1]), data[2], data[3]))
                 # return self.session.query(Application).filter(Application.appId == data[0])
 
             if table == 'Tiers':
                 # tierId, tierName, appId, tierHealth
-                self.session.add(Tiers(data[0], str(data[1]), data[2], data[3]))
+                self.session.add(Tiers(data[0], str(data[1]), data[2], data[3], data[4]))
                 # self.session.add(Tiers(data[0], data[1], data[2], data[3]))
 
             if table == 'Nodes':
                 # nodeId, nodeName, tierId,nodeHealth, ipAddress, appId
-                self.session.add(Nodes(data[0], data[1], data[2], data[3], data[4], data[5]))
+                self.session.add(Nodes(data[0], data[1], data[2], data[3], data[4], data[5], data[6]))
 
             if table == 'ServiceEndpoints':
                 # sepId, sep, tierId, appId
-                self.session.add(ServiceEndpoints(data[0], data[1], data[2], data[3]))
+                self.session.add(ServiceEndpoints(data[0], data[1], data[2], data[3], data[4]))
 
             if table == 'HealthViolations':
                 # violationId, startTime, businessTransaction,description,severity,tierId,appId
-                self.session.add(HealthViolations(data[0], data[1], data[2], data[3], data[4], data[5], data[6]))
+                self.session.add(HealthViolations(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]))
 
             if table == 'ACItemp':
                 # IP, dn, appId, selector (0 or 1)
@@ -215,7 +307,7 @@ class Database():
 
             if table == 'ACIPerm':
                 # IP, dn, appId
-                self.session.add(ACIperm(data[0], data[1], data[2]))
+                self.session.add(ACIperm(data[0], data[1], data[2], data[3]))
                 # self.commitSession()
                 # current_app.logger.info('Values populated into Table '+str(table))
         except Exception as e:
@@ -231,29 +323,29 @@ class Database():
             if table == 'Application':
                 # appId, appName, appMetrics
                 self.session.query(Application).filter(Application.appId == data[0]).update(
-                    {'appName': str(data[1]), 'appMetrics': data[2]})
+                    {'appName': str(data[1]), 'appMetrics': data[2], 'timestamp': data[3]})
                 # return self.session.query(Application).filter(Application.appId == data[0])
 
             if table == 'Tiers':
                 # tierId, tierName, appId, tierHealth
                 self.session.query(Tiers).filter(Tiers.tierId == data[0]).update(
-                    {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3]})
+                    {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3], 'timestamp': data[4]})
 
             if table == 'Nodes':
                 # nodeId, nodeName, tierId, nodeHealth, ipAddress
                 self.session.query(Nodes).filter(Nodes.nodeId == data[0]).update(
-                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4]})
+                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4], 'timestamp': data[5]})
 
             if table == 'ServiceEndpoints':
                 # sepId, sep, tierId
                 self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == data[0]).update(
-                    {'sep': data[1], 'tierId': data[2]})
+                    {'sep': data[1], 'tierId': data[2], 'timestamp': data[3]})
                 #
             if table == 'HealthViolations':
                 # violationId, startTime, businessTransaction,description,severity,tierId,appId
                 self.session.query(HealthViolations).filter(HealthViolations.violationId == data[0]).update(
                     {'startTime': data[1], 'businessTransaction': data[2], 'description': data[3], 'severity': data[4],
-                     'tierId': data[5], 'appId': data[6]}, synchronize_session='fetch')
+                     'tierId': data[5], 'appId': data[6], 'timestamp': data[7]}, synchronize_session='fetch')
                 #
             if table == 'ACItemp':
                 # IP, dn, appId, selector (0 or 1)
@@ -356,6 +448,89 @@ class Database():
                 current_app.logger.info('Exception in Check and Delete: ' + str(e))
                 self.commitSession()
 
+    def insertOrUpdate(self, table, key, data):
+        try:
+            if table == "EpgHistory":
+                recordExists = self.session.query(exists().where(EpgHistory.epgDn == key)).scalar()
+                
+                if recordExists:
+                    data_dict = {
+                        "epgFaultRecords": data[0],
+                        "epgHealthRecords": data[1],
+                        "epgEventRecords": data[2],
+                        "epgLogRecords": data[3],
+                        "timestamp": data[4]
+                    }
+                    action = "Updating"
+                    self.session.query(EpgHistory).filter(EpgHistory.epgDn == key).update(data_dict)
+                else:
+                    action = "Inserting"
+                    epgHistoryRecord = EpgHistory(epgDn = key, epgFaultRecords = data[0], epgHealthRecords = data[1], epgEventRecords = data[2], epgLogRecords = data[3], timestamp = data[4])
+                    self.session.add(epgHistoryRecord)
+                
+            elif table == "EpgSummary":
+                recordExists = self.session.query(exists().where(EpgSummary.epgDn == key)).scalar()
+                
+                if recordExists:
+                    data_dict = {
+                        "epgDomains": data[0],
+                        "epgSubnets": data[1],
+                        "epgStaticEps": data[2],
+                        "epgStaticLeaves": data[3],
+                        "epgFcPaths": data[4],
+                        "epgStaticPorts": data[5],
+                        "epgIfConns": data[6],
+                        "epgContracts": data[7],
+                        "epgLabels": data[8],
+                        "timestamp": data[9]
+                    }
+                    action = "Updating"
+                    self.session.query(EpgSummary).filter(EpgSummary.epgDn == key).update(data_dict)
+                else:
+                    action = "Inserting"
+                    epgSummaryRecord = EpgSummary(epgDn = key, epgDomains = data[0], epgSubnets = data[1], epgStaticEps = data[2], epgStaticLeaves = data[3], epgFcPaths = data[4], 
+                    epgStaticPorts = data[5], epgIfConns = data[6], epgContracts = data[7], epgLabels = data[8], timestamp = data[9])
+                    self.session.add(epgSummaryRecord)
+            elif table == "ApHistory":
+                recordExists = self.session.query(exists().where(ApHistory.apDn == key)).scalar()
+                
+                if recordExists:
+                    data_dict = {
+                        "apFaultRecords": data[0],
+                        "apHealthRecords": data[1],
+                        "apEventRecords": data[2],
+                        "apLogRecords": data[3],
+                        "timestamp": data[4]
+                    }
+                    action = "Updating"
+                    self.session.query(ApHistory).filter(ApHistory.apDn == key).update(data_dict)
+                else:
+                    action = "Inserting"
+                    epgHistoryRecord = ApHistory(apDn = key, apFaultRecords = data[0], apHealthRecords = data[1], apEventRecords = data[2], apLogRecords = data[3], timestamp = data[4])
+                    self.session.add(epgHistoryRecord)
+            elif table == "ApSummary":
+                recordExists = self.session.query(exists().where(ApSummary.apDn == key)).scalar()
+                
+                if recordExists:
+                    data_dict = {
+                        "apEpgs": data[0],
+                        "apUsegEpgs": data[1],
+                        "timestamp": data[2]
+                    }
+                    action = "Updating"
+                    self.session.query(ApSummary).filter(ApSummary.apDn == key).update(data_dict)
+                else:
+                    action = "Inserting"
+                    apSummaryRecord = ApSummary(apDn = key, apEpgs = data[0], apUsegEpgs = data[1], timestamp = data[2])
+                    self.session.add(apSummaryRecord)
+                    
+            self.commitSession()
+
+        except Exception as ex:
+            current_app.logger.info('Exception while ' + action + ' Record in: \n Table : ' + table + "\n " + str(ex))
+            self.commitSession()
+        
+                
     # Gets Data From Table and Updates or Inserts a record with given ID
     def checkIfExistsandUpdate(self, table, data):
         try:
@@ -402,6 +577,7 @@ class Database():
         try:
             if query_type == 'appId':
                 # query = self.session.query(Application).all()
+
                 return self.session.query(Application).filter(Application.appId == query_params)
             if query_type == 'appName':
                 return self.session.query(Application).filter(Application.appName == query_params)
@@ -410,6 +586,84 @@ class Database():
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Application details. Error: " + str(
                                    e)})
+
+    def returnFaults(self, dn):
+        try:
+            faults_list = []
+            if "/epg-" in dn:
+                epg_records = self.session.query(EpgHistory.epgDn, EpgHistory.epgFaultRecords).filter(EpgHistory.epgDn == dn)
+                for epg in epg_records:
+                    faults_list = epg.epgFaultRecords["faultRecords"]
+                
+            elif "/ap-" in dn:
+                ap_records = self.session.query(ApHistory.apDn, ApHistory.apFaultRecords).filter(ApHistory.apDn == dn)
+                for ap in ap_records:
+                    faults_list = ap.apFaultRecords["faultRecords"]
+            
+            return {
+                "payload" : faults_list,
+                "status" : True,
+                "message" : ""
+            }
+                
+        except Exception as ex:
+            return {
+                "payload": [],
+                "status": False,
+                "message": "Internal backend error: could not return Fault details. Error: " + str(ex)
+            }
+    
+    def returnEvents(self, dn):
+        try:
+            events_list = []
+            if "/epg-" in dn:
+                epg_records = self.session.query(EpgHistory.epgDn, EpgHistory.epgEventRecords).filter(EpgHistory.epgDn == dn)
+                for epg in epg_records:
+                    events_list = epg.epgEventRecords["eventRecords"]
+                
+            elif "/ap-" in dn:
+                ap_records = self.session.query(ApHistory.apDn, ApHistory.apEventRecords).filter(ApHistory.apDn == dn)
+                for ap in ap_records:
+                    events_list = ap.apEventRecords["eventRecords"]
+            
+            return {
+                "payload" : events_list,
+                "status" : True,
+                "message" : ""
+            }
+                
+        except Exception as ex:
+            return {
+                "payload": [],
+                "status": False,
+                "message": "Internal backend error: could not return Event details. Error: " + str(ex)
+            }
+    
+    def returnAuditLogs(self, dn):
+        try:
+            audit_logs_list = []
+            if "/epg-" in dn:
+                epg_records = self.session.query(EpgHistory.epgDn, EpgHistory.epgLogRecords).filter(EpgHistory.epgDn == dn)
+                for epg in epg_records:
+                    audit_logs_list = epg.epgLogRecords["auditLogRecords"]
+                
+            elif "/ap-" in dn:
+                ap_records = self.session.query(ApHistory.apDn, ApHistory.apLogRecords).filter(ApHistory.apDn == dn)
+                for ap in ap_records:
+                    audit_logs_list = ap.apLogRecords["auditLogRecords"]
+            
+            return {
+                "payload" : audit_logs_list,
+                "status" : True,
+                "message" : ""
+            }
+                
+        except Exception as ex:
+            return {
+                "payload": [],
+                "status": False,
+                "message": "Internal backend error: could not return Audit Log details. Error: " + str(ex)
+            }
 
     def returnTiers(self, query_type, query_params):
         try:
@@ -424,6 +678,7 @@ class Database():
             self.flushSession()
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Tier details. Error: " + str(e)})
+
 
     def returnNodes(self, query_type, query_params):
         try:

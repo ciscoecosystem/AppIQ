@@ -106,18 +106,16 @@ def login(appd_creds):
         appd_ip = "https://"+parseHost(host)
     # parsed_host = parseHost(appd_ip)
     credentials = {'appd_ip': appd_ip, 'appd_port': appd_port, 'appd_user': appd_user, 'appd_account': appd_account,
-                   'appd_pw': appd_pw}
+                   'appd_pw': appd_pw, "polling_interval": "1"}
     appd_object = AppDConnect.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
     try:
         login_check = appd_object.check_connection()
         # print login_check
-        login_resp = dict()
 
         if login_check == 200 or login_check == 201:
             # path = "/Users/nilayshah/Desktop/AppD_cisco23lab/Cisco_AppIQ/Service/credentials.json"
             path = "/home/app/data/credentials.json"
             Process(target=appd_object.main).start()
-            #threading.Thread(target=appd_object.main).start()
             # with open('/home/app/credentials/credentials.json', 'w+') as creds:
             with open(path, 'w+') as creds:
                 creds.seek(0)
@@ -140,10 +138,29 @@ def login(appd_creds):
                            "message": "An error occured while saving AppDynamics Credentials. Please try again! Error: "+str(e)})
 
 
-# payload = [{}]
-# json.dumps({"payload":payload,"status_code":"200","message":"OK"})
+def setPollingInterval(interval):
+    """
+    Sets the polling interval in AppDynamics config file
+    """
+    path = "/home/app/data/credentials.json"
+    try:
+        if os.path.isfile(path):
+            with open(path, "r+") as creds:
+                config_data = json.load(creds)
+                config_data["polling_interval"] = str(interval)
 
-
+                creds.seek(0)
+                creds.truncate()
+                json.dump(config_data, creds)
+            
+            return "200", "Polling Interval Set!"
+        else:
+            return "300", "Could not find Configuration File"
+    except Exception as err:
+        err_msg = "Exception while setting polling Interval : " + str(err)
+        app.logger.error(err_msg)
+        return "300", err_msg
+    
 
 @app.route('/apps.json',
            methods=['GET'])  # This shall be called from /check.json, for Cisco Live this is the first/start Route
@@ -193,6 +210,8 @@ def mapping(tenant, appDId):
         else:
             app_list = database_object.getappList()
             app.logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
+            
+            # Why not get the App with given AppId from DB??
             for each in app_list:
                 if each.get('appId') == appDId and each.get('isViewEnabled') == True:
                     app.logger.info("Mapping Empty!")
@@ -243,6 +262,98 @@ def saveMapping(appDId, tenant, mappedData):
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not save mappings to the database. Error: "+str(e)})
 
 
+def getFaults(dn):
+    """
+    Get List of Faults related to the given MO from Database
+    """
+    faults_resp = database_object.returnFaults(dn)
+    if faults_resp["status"]:
+        faults_list = faults_resp["payload"]
+        faults_payload = []
+        for fault in faults_list:
+            fault_attr = fault["faultRecord"]["attributes"]
+            fault_dict = {
+                "code" : fault_attr["code"],
+                "severity" : fault_attr["severity"],
+                "affected" : fault_attr["affected"],
+                "descr" : fault_attr["descr"],
+                "created" : fault_attr["created"]
+            }
+            faults_payload.append(fault_dict)
+        return json.dumps({
+            "status_code": "200",
+            "message": "OK",
+            "payload": faults_payload
+        })
+    else:
+        return json.dumps({
+            "status_code": "300",
+            "message": faults_resp["message"],
+            "payload": []
+        })
+
+def getEvents(dn):
+    """
+    Get List of Events related to the given MO from Database
+    """
+    events_resp = database_object.returnEvents(dn)
+    if events_resp["status"]:
+        events_list = events_resp["payload"]
+        events_payload = []
+        for event in events_list:
+            event_attr = event["eventRecord"]["attributes"]
+            event_dict = {
+                "code" : event_attr["code"],
+                "severity" : event_attr["severity"],
+                "affected" : event_attr["affected"],
+                "descr" : event_attr["descr"],
+                "created" : event_attr["created"],
+                "cause" : event_attr["cause"]
+            }
+            events_payload.append(event_dict)
+        return json.dumps({
+            "status_code": "200",
+            "message": "OK",
+            "payload": events_payload
+        })
+    else:
+        return json.dumps({
+            "status_code": "300",
+            "message": events_resp["message"],
+            "payload": []
+        })
+
+def getAuditLogs(dn):
+    """
+    Get List of Audit Log Records related to the given MO from Database
+    """
+    audit_logs_resp = database_object.returnAuditLogs(dn)
+    if audit_logs_resp["status"]:
+        audit_logs_list = audit_logs_resp["payload"]
+        audit_logs_payload = []
+        for audit_log in audit_logs_list:
+            audit_log_attr = audit_log["aaaModLR"]["attributes"]
+            audit_log_dict = {
+                "affected" : audit_log_attr["affected"],
+                "descr" : audit_log_attr["descr"],
+                "created" : audit_log_attr["created"],
+                "id" : audit_log_attr["id"],
+                "action" : audit_log_attr["ind"],
+                "user" : audit_log_attr["user"]
+            }
+            audit_logs_payload.append(audit_log_dict)
+        return json.dumps({
+            "status_code": "200",
+            "message": "OK",
+            "payload": audit_logs_payload
+        })
+    else:
+        return json.dumps({
+            "status_code": "300",
+            "message": audit_logs_resp["message"],
+            "payload": []
+        })
+
 # This will be called from the UI - after the Mappings are completed
 @app.route('/enableView.json')
 def enableView(appid, bool):
@@ -264,7 +375,6 @@ def tree(tenantName, appId):
     except Exception as e:
         app.logger.exception("Error while run.json" + str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
-
 
 
 def merge_aci_appd(tenant, appDId):
@@ -354,11 +464,8 @@ def merge_aci_appd(tenant, appDId):
         app.logger.info('Merge complete. Total objects correlated :'+str(len(final_list)))
         return final_list#updated_merged_list#,total_epg_count # TBD for returning values
     except Exception as e:
-        app.logger.exception("Error while merge_aci_data"+str(e))
+        app.logger.exception("Error while merge_aci_data : "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Merge ACI and AppDynamics objects. Error: "+str(e)})
-
-
-
 
 
 def getappD(appId, ep):
@@ -399,7 +506,6 @@ def getappD(appId, ep):
         return appd_list
     except Exception as e:
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
-
 
 
 @app.route('/details.json')  # Will take tenantname and appId as arguments

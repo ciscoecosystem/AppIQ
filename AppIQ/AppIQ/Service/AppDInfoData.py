@@ -1,10 +1,13 @@
 __author__ = 'nilayshah'
 import requests
-import json, time
+import json, time, os
 from pprint import pprint
 import AppD_Alchemy as AppD_Database
+import ACI_Local as aci_local
+import datetime
 import threading
 from flask import current_app
+
 
 class AppD(object):
     def __init__(self, host, port, user, account, password):
@@ -442,12 +445,177 @@ class AppD(object):
             current_app.logger.info('Failed to get Node Details for NodeID: ' + nodeId + ' in Application with AppID: ' + appId + '\nException: ' + str(ex))
             return []
 
+    def get_dict_records(self, list_of_records, key):
+        records_dict = dict()
+        records_dict[key] = list_of_records
+        return records_dict
+
+    def get_epg_history(self, timeStamp):
+        try:
+            aci_local_object = aci_local.ACI_Local("")
+            epg_resp = aci_local_object.get_all_mo_instances("fvAEPg")
+            if (epg_resp["status"]):
+                epg_list = epg_resp["payload"]
+                if (epg_list):
+                    for epg in epg_list:
+                        epg_dn = epg["fvAEPg"]["attributes"]["dn"]
+                        
+                        fault_query_string = "rsp-subtree-include=fault-records,no-scoped,subtree"
+                        faults_list = aci_local_object.get_mo_related_item(epg_dn, fault_query_string, "")
+                        faults_dict = self.get_dict_records(faults_list, "faultRecords")
+
+                        events_query_string = "rsp-subtree-include=event-logs,no-scoped,subtree"
+                        events_list = aci_local_object.get_mo_related_item(epg_dn, events_query_string, "")
+                        events_dict = self.get_dict_records(events_list, "eventRecords")
+
+                        audit_logs_query_string = "rsp-subtree-include=audit-logs,no-scoped,subtree"
+                        audit_logs_list = aci_local_object.get_mo_related_item(epg_dn, audit_logs_query_string, "")
+                        audit_logs_dict = self.get_dict_records(audit_logs_list, "auditLogRecords")
+
+                        health_records = aci_local_object.get_mo_related_item(epg_dn, "", "HealthRecords")
+                        health_records_dict = self.get_dict_records(health_records, "healthRecords")
+
+                        epgHistoryData = [faults_dict, health_records_dict, events_dict, audit_logs_dict, timeStamp]
+                        
+                        self.databaseObject.insertOrUpdate("EpgHistory", epg_dn, epgHistoryData)
+                        self.get_epg_summary(epg_dn, timeStamp)
+
+                else:
+                    current_app.logger.info("EPgs not found")
+        except Exception as ex:
+            current_app.logger.info("Exception while processing Epg History : " + str(ex))
+    
+    
+    def get_epg_summary(self, epg_dn, timeStamp):
+        try:
+            aci_local_object = aci_local.ACI_Local("")
+            
+            domains_dict = {"domainRecords" : []}
+            subnets_dict = {"subnetRecords" : []}
+            static_eps_dict = {"staticEpRecords": []}
+            static_leaves_dict = {"staticLeafRecords" : []}
+            fc_path_dict = {"fcPathRecords" : []}
+            static_ports_dict = {"staticPortRecords" : []}
+
+            multiple_obj_query_string = "query-target=children&target-subtree-class=fvRsDomAtt,fvSubnet,fvStCEp,fvRsNodeAtt,fvRsFcPathAtt,fvRsPathAtt"
+            multiple_objs_list = aci_local_object.get_mo_related_item(epg_dn, multiple_obj_query_string, "")
+            
+            contracts_query_string = "query-target=subtree&target-subtree-class=fvRsCons&target-subtree-class=fvRsConsIf,fvRsProtBy,fvRsProv,vzConsSubjLbl,vzProvSubjLbl,vzConsLbl,vzProvLbl,fvRsIntraEpg"
+            contracts_list = aci_local_object.get_mo_related_item(epg_dn, contracts_query_string, "")
+            contracts_dict = self.get_dict_records(contracts_list, "contractRecords")
+
+            epg_labels_query_string = "query-target=children&target-subtree-class=fvCEp&rsp-subtree=children&rsp-subtree-class=fvRsToVm,fvRsVm,fvRsHyper,fvRsCEpToPathEp,fvIp,fvPrimaryEncap"
+            epg_labels_list = aci_local_object.get_mo_related_item(epg_dn, epg_labels_query_string, "")
+            epg_labels_dict = self.get_dict_records(epg_labels_list, "epgLabelRecords")
+
+            if_conn_query_string = "query-target=subtree&target-subtree-class=fvIfConn"
+            if_conn_list = aci_local_object.get_mo_related_item(epg_dn, if_conn_query_string, "ifConnRecords")
+            if_conn_dict = self.get_dict_records(if_conn_list, "ifaceConnRecords")
+
+            for obj in multiple_objs_list:
+                for key in obj:
+                    if key == "fvRsDomAtt":
+                        domains_dict["domainRecords"].append(obj)
+                    elif key == "fvSubnet":
+                        subnets_dict["subnetRecords"].append(obj)
+                    elif key == "fvStCEp":
+                        static_eps_dict["staticEpRecords"].append(obj)
+                    elif key == "fvRsNodeAtt":
+                        static_leaves_dict["staticLeafRecords"].append(obj)
+                    elif key == "fvRsFcPathAtt":
+                        fc_path_dict["fcPathRecords"].append(obj)
+                    elif key == "fvRsPathAtt":
+                        static_ports_dict["staticPortRecords"].append(obj)
+
+            epgSummaryData = [domains_dict, subnets_dict, static_eps_dict, static_leaves_dict, fc_path_dict, static_ports_dict, if_conn_dict, contracts_dict, epg_labels_dict, timeStamp]
+            
+            self.databaseObject.insertOrUpdate("EpgSummary", epg_dn, epgSummaryData)
+            
+        except Exception as ex:
+            current_app.logger.info("Exception while processing Epg Summary : " + str(ex))
+    
+
+    def get_ap_history(self, timeStamp):
+        try:
+            aci_local_object = aci_local.ACI_Local("")
+            ap_resp = aci_local_object.get_all_mo_instances("fvAp")
+            if (ap_resp["status"]):
+                ap_list = ap_resp["payload"]
+                if (ap_list):
+                    for ap in ap_list:
+                        ap_dn = ap["fvAp"]["attributes"]["dn"]
+                        
+                        fault_query_string = "rsp-subtree-include=fault-records,no-scoped,subtree"
+                        faults_list = aci_local_object.get_mo_related_item(ap_dn, fault_query_string, "")
+                        faults_dict = self.get_dict_records(faults_list, "faultRecords")
+
+                        events_query_string = "rsp-subtree-include=event-logs,no-scoped,subtree"
+                        events_list = aci_local_object.get_mo_related_item(ap_dn, events_query_string, "")
+                        events_dict = self.get_dict_records(events_list, "eventRecords")
+
+                        audit_logs_query_string = "rsp-subtree-include=audit-logs,no-scoped,subtree"
+                        audit_logs_list = aci_local_object.get_mo_related_item(ap_dn, audit_logs_query_string, "")
+                        audit_logs_dict = self.get_dict_records(audit_logs_list, "auditLogRecords")
+
+                        health_records = aci_local_object.get_mo_related_item(ap_dn, "", "HealthRecords")
+                        health_records_dict = self.get_dict_records(health_records, "healthRecords")
+
+                        apHistoryData = [faults_dict, health_records_dict, events_dict, audit_logs_dict, timeStamp]
+                        
+                        self.databaseObject.insertOrUpdate("ApHistory", ap_dn, apHistoryData)
+                        self.get_ap_summary(ap_dn, timeStamp)
+
+                else:
+                    current_app.logger.info("Application Profiles not found")
+        except Exception as ex:
+            current_app.logger.info("Exception while processing Application Profile History : " + str(ex))
+    
+    def get_ap_summary(self, ap_dn, timeStamp):
+        try:
+            aci_local_object = aci_local.ACI_Local("")
+            
+            epg_query_string = "query-target=subtree&target-subtree-class=fvAEPg"
+            epg_list = aci_local_object.get_mo_related_item(ap_dn, epg_query_string, "")
+            epgs_dict = self.get_dict_records(epg_list, "epgRecords")
+            
+            useg_epg_query_string = "query-target=subtree&target-subtree-class=fvAEPg&query-target-filter=eq(fvAEPg.isAttrBasedEPg,\"true\")&rsp-subtree=children&rsp-subtree-class=fvRsBd"
+            useg_epg_list = aci_local_object.get_mo_related_item(ap_dn, useg_epg_query_string, "")
+            useg_epgs_dict = self.get_dict_records(useg_epg_list, "usegEpgRecords")
+            
+            ap_summary_data = [epgs_dict, useg_epgs_dict, timeStamp]
+
+            self.databaseObject.insertOrUpdate("ApSummary", ap_dn, ap_summary_data)
+
+        except Exception as ex:
+            current_app.logger.info("Exception while processing Ap Summary \n Error :  " + str(ex))
+
+    def get_config_data(self, data_key):
+        path = "/home/app/data/credentials.json"
+
+        try:
+            if os.path.isfile(path):
+                with open(path, "r") as creds:
+                    config_data = json.load(creds)
+                    data_value = config_data[data_key]
+                    return data_value
+        except KeyError as key_err:
+            current_app.logger.error("Could not find " + data_key + " in Configuration File" + str(key_err))
+            return ""
+        except Exception as err:
+            current_app.logger.error("Exception while fetching data from Configuration file " + str(err))
+            return ""
+
 
     def main(self):
         while True:
+            
+            start_time = datetime.datetime.now()
+            timeStamp = datetime.datetime.utcnow()
+
             self.databaseObject = AppD_Database.Database()
             self.check_connection()
             current_app.logger.info('Starting Database Update!')
+            
             try:
                 apps = self.get_app_info()
                 current_app.logger.info('Total apps found in the DB:' + str(len(apps)))
@@ -458,13 +626,14 @@ class AppD(object):
             nodeidlist = []
             sepList = []
             violationList = []
+            
             try:
                 if apps:
                     for app in apps:
                         app_metrics = self.get_app_health(app.get('id'))
                         appidList.append(app.get('id'))
                         self.databaseObject.checkIfExistsandUpdate('Application',
-                                                                   [app.get('id'), str(app.get('name')), app_metrics])
+                                                                   [app.get('id'), str(app.get('name')), app_metrics, timeStamp])
                     for app in apps:
                         tiers = self.get_tier_info(app.get('id'))
                         if tiers:
@@ -477,7 +646,7 @@ class AppD(object):
                                     self.databaseObject.checkIfExistsandUpdate('Tiers',
                                                                                [tier.get('id'), str(tier.get('name')),
                                                                                 app.get('id'),
-                                                                                str(tier_health)])
+                                                                                str(tier_health), timeStamp])
 
                                 # current_app.logger.info('Updated Tiers: Total - ' + str(len(tiers)))
                             for tier in tiers:
@@ -495,7 +664,7 @@ class AppD(object):
                                                 self.databaseObject.checkIfExistsandUpdate('ServiceEndpoints',
                                                                                            [sep.get('sepId'), sep,
                                                                                             tier.get('id'),
-                                                                                            app.get('id')])
+                                                                                            app.get('id'), timeStamp])
                                                 sepList.append(sep['sepId'])
                                                 # self.databaseObject.commitSession()
                                         except Exception as e:
@@ -512,7 +681,7 @@ class AppD(object):
                                                                                             violations.get('Affected Object'),
                                                                                             violations.get('Description'),
                                                                                             violations.get('Severity'),
-                                                                                            tier.get('id'), app.get('id')])
+                                                                                            tier.get('id'), app.get('id'), timeStamp])
                                                 violationList.append(violations.get('Violation Id'))
                                         except Exception as e:
                                             current_app.logger.info('Exception in HEV, Error:'+str(e))
@@ -556,7 +725,7 @@ class AppD(object):
                                                                                                         str(node.get('name')),
                                                                                                         tier.get('id'),
                                                                                                         str(node_health),
-                                                                                                        ipList, app.get('id')])
+                                                                                                        ipList, app.get('id'), timeStamp])
                                                             nodeidlist.append(node.get('id'))
                                                             ipList = []
                                                             current_app.logger.info(
@@ -564,40 +733,41 @@ class AppD(object):
                                                                     app.get('name')) + ', Tier - ' + str(
                                                                     tier.get('id')) + ', Node - ' + str(node.get('id')))
                                                         
-                                                    # if 'ipAddresses' in node and node.get('ipAddresses'):
-                                                    #     if 'ipAddresses' in node.get('ipAddresses') and node.get('ipAddresses').get('ipAddresses'):
-                                                    #         for i in range(len(node.get('ipAddresses').get('ipAddresses'))):
-                                                    #             if '%' in node.get('ipAddresses').get('ipAddresses')[i]:
-                                                    #                 ipv6 = node.get('ipAddresses').get('ipAddresses')[i].split('%')[0]
-                                                    #                 ipList.append(str(ipv6))
-                                                    #             else:
-                                                    #                 ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
-                                                    #                 ipList.append(str(ipv4))
-                                                    #         self.databaseObject.checkIfExistsandUpdate('Nodes',
-                                                    #                                                    [node.get('id'),
-                                                    #                                                     str(node.get('name')),
-                                                    #                                                     tier.get('id'),
-                                                    #                                                     str(node_health),
-                                                    #                                                     ipList, app.get('id')])
-                                                    #         nodeidlist.append(node.get('id'))
-                                                    #         ipList = []
-                                                    #         current_app.logger.info(
-                                                    #             'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
-                                                    #                 app.get('name')) + ', Tier - ' + str(
-                                                    #                 tier.get('id')) + ', Node - ' + str(node.get('id')))
-                                                    
                     self.databaseObject.checkAndDelete('Application', appidList)
                     self.databaseObject.checkAndDelete('Tiers', tieridList)
                     self.databaseObject.checkAndDelete('ServiceEndpoints', sepList)
                     self.databaseObject.checkAndDelete('HealthViolations', violationList)
                     self.databaseObject.checkAndDelete('Nodes', nodeidlist)
+                    
+                    self.get_epg_history(timeStamp)
+                    self.get_ap_history(timeStamp)
+                    
                     self.databaseObject.commitSession()
+
+                    polling_interval = self.get_config_data("polling_interval")
+                    
+                    # Get Polling Interval from Config File
+                    if not polling_interval:
+                        current_app.logger.info("Exception while getting Polling Interval\nTaking Default Polling Interval of 60 Seconds...")
+                        polling_interval = 60
+                    else:
+                        polling_interval = int(polling_interval)
+                        polling_interval = polling_interval * 60
+
+                    end_time =  datetime.datetime.now()
+                    total_time = str(end_time - start_time)
+                    
+                    current_app.logger.info("===total_time===" + total_time)
+                    current_app.logger.info("====polling_interval====" + str(polling_interval))
                     current_app.logger.info('Database Update Complete!')
-                    time.sleep(30)  # threading.Timer(60, self.main).start()
+                    
+                    current_app.logger.info(total_time)
+                    
+                    time.sleep(polling_interval)  # threading.Timer(60, self.main).start()
             except Exception as e:
                 current_app.logger.info('Exception in AppDInfoData Main, Error: ' + str(e))
                 self.databaseObject.commitSession()
-                time.sleep(60)
+                time.sleep(polling_interval)
                 self.main()
                 # except:
                 #     self.databaseObject.commitSession()
