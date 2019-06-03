@@ -35,10 +35,12 @@ class GetEvents(graphene.ObjectType):
 class GetAuditLogs(graphene.ObjectType):
     auditLogsList = graphene.String()
 
+class GetOperationalInfo(graphene.ObjectType):
+    operationalList = graphene.String()
+
 class SetPollingInterval(graphene.ObjectType):
     status = graphene.String()
     message = graphene.String()
-
 
 class Run(graphene.ObjectType):
     response = graphene.String()
@@ -65,6 +67,7 @@ class Query(graphene.ObjectType):
     GetFaults = graphene.Field(GetFaults, dn=graphene.String())
     GetEvents = graphene.Field(GetEvents, dn=graphene.String())
     GetAuditLogs = graphene.Field(GetAuditLogs, dn=graphene.String())
+    GetOperationalInfo = graphene.Field(GetOperationalInfo, dn = graphene.String(), ipList = graphene.String())
     SetPollingInterval = graphene.Field(SetPollingInterval, interval = graphene.String())
 
     # EnableView = graphene.Field(EnableView,view=graphene.String())
@@ -81,6 +84,10 @@ class Query(graphene.ObjectType):
     def resolve_GetAuditLogs(self, info, dn):
         GetAuditLogs.auditLogsList = app.getAuditLogs(dn)
         return GetAuditLogs
+    
+    def resolve_GetOperationalInfo(self, info, dn, ipList):
+        GetOperationalInfo.operationalList = app.getChildrenEpInfo(dn, ipList)
+        return GetOperationalInfo
 
     def resolve_SetPollingInterval(self, info, interval):
         status, message = app.setPollingInterval(interval)
@@ -88,7 +95,6 @@ class Query(graphene.ObjectType):
         SetPollingInterval.message = message
         return SetPollingInterval
 
-    
     def resolve_Check(self,info): #On APIC
     #def resolve_Check(self, args, context, info):  # On local desktop
         Check.checkpoint = app.checkFile()

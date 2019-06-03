@@ -334,7 +334,7 @@ class Database():
             if table == 'Nodes':
                 # nodeId, nodeName, tierId, nodeHealth, ipAddress
                 self.session.query(Nodes).filter(Nodes.nodeId == data[0]).update(
-                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4], 'timestamp': data[5]})
+                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4], 'appId': data[5] 'timestamp': data[6]})
 
             if table == 'ServiceEndpoints':
                 # sepId, sep, tierId

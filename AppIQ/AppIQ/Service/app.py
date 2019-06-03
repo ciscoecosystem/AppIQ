@@ -7,6 +7,8 @@ from schema import schema
 import AppD_Alchemy as Database
 import AppDInfoData as AppDConnect
 import os
+import urllib3
+urllib3.disable_warnings()
 
 app = Flask(__name__)
 CORS(app, resources={r"/graphql.json": {"origins": "*"}}) # CORS used for what?

@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 import json, time, logging, os, pprint
 import threading
 import socket
+import re
 # import ACI_Info as aci_local
 import ACI_Local as aci_local
 import AppDInfoData as AppDConnect
@@ -353,6 +354,119 @@ def getAuditLogs(dn):
             "message": audit_logs_resp["message"],
             "payload": []
         })
+
+def getChildrenEpInfo(dn, mo_type, ip_list):
+    aci_local_object = aci_local.ACI_Local("")
+    ip_list = ip_list.split(",")
+    
+    ip_query_filter_list = []
+    for ip in ip_list:
+        ip_query_filter_list.append('eq(fvCEp.ip,"' + ip + '")')
+    
+    ip_query_filter = ",".join(ip_query_filter_list)
+
+    ep_info_query_string = 'query-target=children&target-subtree-class=fvCEp&query-target-filter=or(' + ip_query_filter +')&rsp-subtree=children&rsp-subtree-class=fvRsHyper,fvRsCEpToPathEp,fvRsVm'
+    
+    ep_list = aci_local_object.get_mo_related_item(dn, ep_info_query_string, "")
+
+    ep_info_list = []
+    try:
+        for ep in ep_list:
+            ep_info_dict = dict()
+
+            ep_children = ep["fvCEp"]["children"]
+            ep_info = getEpInfo(ep_children, aci_local_object)
+            ep_attr = ep["fvCEp"]["attributes"]
+
+            ep_info_dict = {
+                "ip" : ep_attr["ip"],
+                "mac" : ep_attr["mac"],
+                "learning_source" : ep_attr["lcC"],
+                "encap" : ep_attr["encap"],
+                "ep_name" : ep_info["ep_name"],
+                "hosting_server_name" : ep_info["hosting_server_name"],
+                "iface_name" : ep_info["iface_name"],
+                "ctrlr_name" : ep_info["ctrlr_name"]
+            }
+            ep_info_list.append(ep_info_dict)
+        
+        return json.dumps({
+            "status_code": "200",
+            "message": "OK",
+            "payload": ep_info_list
+        })
+        
+    except Exception as e:
+        app.logger.info("Exception while getting Ep Info : " + str(e))
+        return json.dumps({
+            "status_code": "300",
+            "message": e,
+            "payload": []
+        })
+    
+    
+
+def getEpInfo(ep_children_list, aci_local_object):
+
+    ep_info = {
+        "ctrlr_name" : "",
+        "hosting_server_name" : "",
+        "iface_name" : "",
+        "ep_name" : ""
+    }
+
+    for ep_child in ep_children_list:
+        
+        child_name = ep_child.keys()[0]
+        if child_name == "fvRsHyper":
+            hyperDn = ep_child["fvRsHyper"]["attributes"]["tDn"]
+            try:
+                ctrlr_name = re.compile("\/ctrlr-\[.*\]-").split(hyperDn)[1].split("/")[0]
+            except Exception as e:
+                app.logger.info("")
+                ctrlr_name = ""
+
+            hyper_query_string = 'query-target-filter=eq(compHv.dn,"' + hyperDn + '")'
+            hyper_resp = aci_local_object.get_all_mo_instances("compHv", hyper_query_string)
+
+            if hyper_resp["status"]:
+                if hyper_resp["payload"]:
+                    hyper_name = hyper_resp["payload"][0]["compHv"]["attributes"]["name"]
+                else:
+                    app.logger.info("Could not get Hosting Server Name using Hypervisor info")
+                    hyper_name = ""
+            else:
+                hyper_name = ""
+            ep_info["ctrlr_name"] = ctrlr_name
+            ep_info["hosting_server_name"] = hyper_name
+
+        elif child_name == "fvRsCEpToPathEp":
+            name = ep_child["fvRsCEpToPathEp"]["attributes"]["tDn"]
+            pod_number = name.split("/pod-")[1].split("/")[0]
+            node_number = name.split("/paths-")[1].split("/")[0]
+            eth_name = name.split("/pathep-[")[1][0:-1]
+
+            iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
+            ep_info["iface_name"] = iface_name
+
+        elif child_name == "fvRsVm":
+            vm_dn = ep_child["fvRsVm"]["attributes"]["tDn"]
+
+            vm_query_string = 'query-target-filter=eq(compVm.dn,"' + vm_dn + '")'
+            vm_resp = aci_local_object.get_all_mo_instances("compVm", vm_query_string)
+
+            if vm_resp["status"]:
+                if vm_resp["payload"]:
+                    vm_name = vm_resp["payload"][0]["compVm"]["attributes"]["name"]
+                else:
+                    app.logger.info("Could not get Name of EP using VM info")
+                    vm_name = ""
+            else:
+                vm_name = ""
+            ep_info["ep_name"] = vm_name
+    
+    return ep_info
+
 
 # This will be called from the UI - after the Mappings are completed
 @app.route('/enableView.json')

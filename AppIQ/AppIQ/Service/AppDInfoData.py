@@ -478,7 +478,7 @@ class AppD(object):
                         epgHistoryData = [faults_dict, health_records_dict, events_dict, audit_logs_dict, timeStamp]
                         
                         self.databaseObject.insertOrUpdate("EpgHistory", epg_dn, epgHistoryData)
-                        self.get_epg_summary(epg_dn, timeStamp)
+                        # self.get_epg_summary(epg_dn, timeStamp)
 
                 else:
                     current_app.logger.info("EPgs not found")
@@ -563,7 +563,7 @@ class AppD(object):
                         apHistoryData = [faults_dict, health_records_dict, events_dict, audit_logs_dict, timeStamp]
                         
                         self.databaseObject.insertOrUpdate("ApHistory", ap_dn, apHistoryData)
-                        self.get_ap_summary(ap_dn, timeStamp)
+                        # self.get_ap_summary(ap_dn, timeStamp)
 
                 else:
                     current_app.logger.info("Application Profiles not found")

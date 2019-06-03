@@ -96,7 +96,7 @@ class ACI_Local(object):
             response = requests.get(url,cookies=cookie, verify=False)
             #current_app.logger.info('API call for APIC: '+str(url))
             if response.status_code == 200 or response.status_code == 201:
-                current_app.logger.info('API call success: '+str(url))
+                # current_app.logger.info('API call sucess: '+str(url))
                 return response
             else:
                 apic_token = self.login()
@@ -128,9 +128,12 @@ class ACI_Local(object):
             return []
             # return {"status": False, "payload": []}
 
-    def get_all_mo_instances(self, mo_class):
+    def get_all_mo_instances(self, mo_class, query_string = ""):
         try:
             mo_url = self.proto + self.apic_ip + "/api/node/class/" + mo_class + ".json"
+            if (query_string != ""):
+                mo_url += "?" + query_string
+            
             mo_resp = self.ACI_get(mo_url, cookie = {'APIC-Cookie': self.apic_token})
             mo_instance_list = ((json.loads(mo_resp.text)['imdata']))
             return {"status": True, "payload": mo_instance_list}
