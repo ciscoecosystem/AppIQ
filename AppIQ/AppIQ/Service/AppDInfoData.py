@@ -646,7 +646,7 @@ class AppD(object):
                                     self.databaseObject.checkIfExistsandUpdate('Tiers',
                                                                                [tier.get('id'), str(tier.get('name')),
                                                                                 app.get('id'),
-                                                                                str(tier_health), timeStamp])
+                                                                                str(tier_health)])
 
                                 # current_app.logger.info('Updated Tiers: Total - ' + str(len(tiers)))
                             for tier in tiers:

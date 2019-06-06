@@ -38,6 +38,9 @@ class GetAuditLogs(graphene.ObjectType):
 class GetOperationalInfo(graphene.ObjectType):
     operationalList = graphene.String()
 
+class GetConfiguredAccessPolicies(graphene.ObjectType):
+    accessPoliciesList = graphene.String()
+
 class SetPollingInterval(graphene.ObjectType):
     status = graphene.String()
     message = graphene.String()
@@ -67,7 +70,9 @@ class Query(graphene.ObjectType):
     GetFaults = graphene.Field(GetFaults, dn=graphene.String())
     GetEvents = graphene.Field(GetEvents, dn=graphene.String())
     GetAuditLogs = graphene.Field(GetAuditLogs, dn=graphene.String())
-    GetOperationalInfo = graphene.Field(GetOperationalInfo, dn = graphene.String(), ipList = graphene.String())
+    GetOperationalInfo = graphene.Field(GetOperationalInfo, dn = graphene.String(), moType = graphene.String(), ipList = graphene.String())
+    GetConfiguredAccessPolicies = graphene.Field(GetConfiguredAccessPolicies, tn = graphene.String(), ap = graphene.String(), epg = graphene.String())
+
     SetPollingInterval = graphene.Field(SetPollingInterval, interval = graphene.String())
 
     # EnableView = graphene.Field(EnableView,view=graphene.String())
@@ -85,9 +90,13 @@ class Query(graphene.ObjectType):
         GetAuditLogs.auditLogsList = app.getAuditLogs(dn)
         return GetAuditLogs
     
-    def resolve_GetOperationalInfo(self, info, dn, ipList):
-        GetOperationalInfo.operationalList = app.getChildrenEpInfo(dn, ipList)
+    def resolve_GetOperationalInfo(self, info, dn, moType, ipList):
+        GetOperationalInfo.operationalList = app.getChildrenEpInfo(dn, moType, ipList)
         return GetOperationalInfo
+
+    def resolve_GetConfiguredAccessPolicies(self, info, tn, ap, epg):
+        GetConfiguredAccessPolicies.accessPoliciesList = app.getConfiguredAccessPolicies(tn, ap, epg)
+        return GetConfiguredAccessPolicies
 
     def resolve_SetPollingInterval(self, info, interval):
         status, message = app.setPollingInterval(interval)

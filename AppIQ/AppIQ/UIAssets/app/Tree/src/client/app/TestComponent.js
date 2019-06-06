@@ -77,7 +77,7 @@ export default class TestComponent extends React.Component {
                 </button>
                 </div> */}
 
-                <div className="health-indicators">
+                <div className="health-indicators" id="health-indicators">
                     <h4 style={{marginTop : "50px"}}>Health Legend</h4>
                     <hr/>
                     <div className="health-indicators-table" width="100%">

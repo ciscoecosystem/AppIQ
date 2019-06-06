@@ -29,7 +29,7 @@ export default class LegendNode extends React.Component {
                     this.node = n;
                 }}
                 style={this.state.initialStyle}
-                className={'leafNodeBase'}
+                className={'leafNodeBase1'}
                 onClick={this.props.onClick}
                 transform={"translate(" + this.props.translate.x + "," + this.props.translate.y +")"}
             >

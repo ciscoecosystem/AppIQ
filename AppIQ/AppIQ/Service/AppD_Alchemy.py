@@ -43,16 +43,14 @@ class Tiers(Base):
     tierName = Column(String)
     appId = Column(Integer, ForeignKey('Application.appId'))
     tierHealth = Column(String)
-    timestamp = Column(DateTime)
     sepchild = relationship('ServiceEndpoints', primaryjoin='Tiers.tierId==ServiceEndpoints.tierId', backref='Tiers')
     hevchild = relationship('HealthViolations', primaryjoin='Tiers.tierId==HealthViolations.tierId', backref='Tiers')
 
-    def __init__(self, tierId, tierName, appId, tierHealth, timestamp):
+    def __init__(self, tierId, tierName, appId, tierHealth):
         self.tierId = tierId
         self.tierName = tierName
         self.appId = appId
         self.tierHealth = tierHealth
-        self.tierHealth = timestamp
 
 
 class ServiceEndpoints(Base):
@@ -286,7 +284,7 @@ class Database():
 
             if table == 'Tiers':
                 # tierId, tierName, appId, tierHealth
-                self.session.add(Tiers(data[0], str(data[1]), data[2], data[3], data[4]))
+                self.session.add(Tiers(data[0], str(data[1]), data[2], data[3]))
                 # self.session.add(Tiers(data[0], data[1], data[2], data[3]))
 
             if table == 'Nodes':
@@ -329,12 +327,11 @@ class Database():
             if table == 'Tiers':
                 # tierId, tierName, appId, tierHealth
                 self.session.query(Tiers).filter(Tiers.tierId == data[0]).update(
-                    {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3], 'timestamp': data[4]})
+                    {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3]})
 
             if table == 'Nodes':
                 # nodeId, nodeName, tierId, nodeHealth, ipAddress
-                self.session.query(Nodes).filter(Nodes.nodeId == data[0]).update(
-                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4], 'appId': data[5] 'timestamp': data[6]})
+                self.session.query(Nodes).filter(Nodes.nodeId == data[0]).update({'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4], 'appId': data[5], 'timestamp': data[6]})
 
             if table == 'ServiceEndpoints':
                 # sepId, sep, tierId

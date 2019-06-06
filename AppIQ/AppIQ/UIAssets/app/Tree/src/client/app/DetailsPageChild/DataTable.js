@@ -4,7 +4,8 @@ import {
   TABLE_COLUMNS_AUDIT_LOG,
   TABLE_COLUMNS_EVENTS,
   TABLE_COLUMNS_FAULTS,
-  ROWS_FAULTS
+  ROWS_FAULTS,
+  TABLE_OPERATIONAL
 } from "./tableHeaders.js";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -15,7 +16,8 @@ export default class DataTable extends Component {
     this.tableHeaders = [
       TABLE_COLUMNS_FAULTS,
       TABLE_COLUMNS_EVENTS,
-      TABLE_COLUMNS_AUDIT_LOG
+      TABLE_COLUMNS_AUDIT_LOG,
+	  TABLE_OPERATIONAL
     ];
     this.fetchData = this.fetchData.bind(this);
     this.handleError = this.handleError.bind(this);
@@ -25,8 +27,15 @@ export default class DataTable extends Component {
     };
   }
   handleError(error) {
-    console.log(error);
-    toast.error(JSON.stringify(error), {
+    console.error(error);
+	var errorText = "Error: "
+	if(typeof(error) == "object"){
+		errorText += JSON.stringify(error);
+	}
+	else{
+		errorText += error
+	}
+    toast.error(unescape(errorText), {
       position: toast.POSITION.BOTTOM_CENTER,
       autoClose: 2500
     });
@@ -55,7 +64,7 @@ export default class DataTable extends Component {
     let result = urlParams;
 
     if(result["tn"] == undefined){
-      this.handleError("Error: Cant not find Tanent name");
+      this.handleError("Can not find Tanent name");
       
     }
     else{
@@ -93,7 +102,7 @@ export default class DataTable extends Component {
             console.log(json);
             if ("errors" in json) {
               // Error related to query
-              this.handleError(json.errors[0]["message"]);
+              this.handleError(json.errors[0]["message"] || "Error while fetching data");
             } else {
               // Response successful
               const type = Object.keys(json.data)[0];

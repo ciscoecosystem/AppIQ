@@ -356,17 +356,23 @@ def getAuditLogs(dn):
         })
 
 def getChildrenEpInfo(dn, mo_type, ip_list):
+    """
+    Get Endpoint Details for a given EPG or EP
+    """
     aci_local_object = aci_local.ACI_Local("")
-    ip_list = ip_list.split(",")
-    
-    ip_query_filter_list = []
-    for ip in ip_list:
-        ip_query_filter_list.append('eq(fvCEp.ip,"' + ip + '")')
-    
-    ip_query_filter = ",".join(ip_query_filter_list)
 
-    ep_info_query_string = 'query-target=children&target-subtree-class=fvCEp&query-target-filter=or(' + ip_query_filter +')&rsp-subtree=children&rsp-subtree-class=fvRsHyper,fvRsCEpToPathEp,fvRsVm'
+    if mo_type == "ep":
+        ip_list = ip_list.split(",")
+        ip_query_filter_list = []
+        for ip in ip_list:
+            ip_query_filter_list.append('eq(fvCEp.ip,"' + ip + '")')
+        ip_query_filter = ",".join(ip_query_filter_list)
+
+        ep_info_query_string = 'query-target=children&target-subtree-class=fvCEp&query-target-filter=or(' + ip_query_filter +')&rsp-subtree=children&rsp-subtree-class=fvRsHyper,fvRsCEpToPathEp,fvRsVm'   
     
+    elif mo_type == "epg":
+        ep_info_query_string = 'query-target=children&target-subtree-class=fvCEp&rsp-subtree=children&rsp-subtree-class=fvRsHyper,fvRsCEpToPathEp,fvRsVm'
+
     ep_list = aci_local_object.get_mo_related_item(dn, ep_info_query_string, "")
 
     ep_info_list = []
@@ -377,10 +383,15 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
             ep_children = ep["fvCEp"]["children"]
             ep_info = getEpInfo(ep_children, aci_local_object)
             ep_attr = ep["fvCEp"]["attributes"]
+            
+            mcast_addr = ep_attr["mcastAddr"]
+            if mcast_addr == "not-applicable":
+                mcast_addr = "---"
 
             ep_info_dict = {
                 "ip" : ep_attr["ip"],
                 "mac" : ep_attr["mac"],
+                "mcast_addr" : mcast_addr,
                 "learning_source" : ep_attr["lcC"],
                 "encap" : ep_attr["encap"],
                 "ep_name" : ep_info["ep_name"],
@@ -400,11 +411,9 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
         app.logger.info("Exception while getting Ep Info : " + str(e))
         return json.dumps({
             "status_code": "300",
-            "message": e,
+            "message": str(e),
             "payload": []
         })
-    
-    
 
 def getEpInfo(ep_children_list, aci_local_object):
 
@@ -467,6 +476,56 @@ def getEpInfo(ep_children_list, aci_local_object):
     
     return ep_info
 
+
+def getConfiguredAccessPolicies(tn, ap, epg):
+    aci_local_object = aci_local.ACI_Local("")
+
+    cap_url = "/mqapi2/deployment.query.json?mode=epgtoipg&tn=" + tn + "&ap=" + ap + "&epg=" + epg
+    cap_resp = aci_local_object.get_mo_related_item("", cap_url, "other_url")
+
+    cap_list = []
+    try:
+        for cap in cap_resp:
+            cap_dict = {
+                "domain" : "",
+                "switch_prof" : "",
+                "aep" : "",
+                "iface_prof" : "",
+                "pc_vpc" : "",
+                "node" : "",
+                "path_ep" : "",
+                "vlan_pool" : ""
+            }
+            cap_attr = cap["syntheticAccessPolicyInfo"]["attributes"]
+            
+            # Get Domain Name of Configure Access Policy
+            cap_vmm_prof = cap_attr["domain"].split("/vmmp-")[1].split("/")[0]
+            cap_domain_name = cap_attr["domain"].split("/dom-")[1]
+            cap_dict["domain"] = cap_vmm_prof + "/" + cap_domain_name
+
+            cap_dict["switch_prof"] = cap_attr["nodeP"].split("/nprof-")[1]
+            cap_dict["aep"] = cap_attr["attEntityP"].split("/attentp-")[1]
+            cap_dict["iface_prof"] = cap_attr["accPortP"].split("/accportprof-")[1]
+            cap_dict["pc_vpc"] = cap_attr["accBndlGrp"].split("/accportgrp-")[1]
+            cap_dict["node"] = cap_attr["pathEp"].split("/paths-")[1]
+            cap_dict["path_ep"] = cap_attr["pathEp"].split("/pathep-")[1]
+            cap_dict["vlan_pool"] = cap_attr["vLanPool"].split("/from-")[1]
+
+            cap_list.append(cap_dict)
+        
+        app.logger.info("====cap_list====" + str(cap_list))
+
+        return json.dumps({
+            "status_code": "200",
+            "message": "",
+            "payload": cap_list
+        })
+    except Exception as ex:
+        return json.dumps({
+            "status_code": "300",
+            "message": str(ex),
+            "payload": []
+        })
 
 # This will be called from the UI - after the Mappings are completed
 @app.route('/enableView.json')

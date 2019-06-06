@@ -53,19 +53,25 @@ class DetailsPane extends React.Component {
               </span>
            
             <span style={{ verticalAlign: "super", fontSize:"1.3em",fontWeight:550 }}>
-              {this.props.data.sub_label || "End Point Infomation"}
+               {this.props.data.sub_label || this.props.data.label || this.props.data.name + " Information"}
             </span>
               
               <Icon className="no-link toggle pull-right" size="icon-medium-small" type="icon-exit-contain" onClick={this.props.closeDetailsPane}>&nbsp;</Icon>
               
-              <Icon className="no-link toggle pull-right" size="icon-medium-small" type="icon-jump-out" onClick={()=>this.props.openDetailsPage(this.state.data)}>&nbsp;</Icon>
+              {this.state.data.name !== "Node" ? <Icon className="no-link toggle pull-right" size="icon-medium-small" type="icon-jump-out" onClick={() => this.props.openDetailsPage(this.state.data)}>&nbsp;</Icon> : null}
           </div>
           <div className="panel-body">
+		  <AppdData data={this.state.data}></AppdData>
             <div className="info-div">
+			{this.state.data.level == "grey" ? 
+			<div>EP Count : {Object.keys(this.state.data.attributes).length}</div> : null
+			}
               {this.state.data.name} Information
               <CardData
+			   name = {this.state.data.sub_label || false}
+			  level = {this.state.data.level || false}
                 attributes={this.state.data.attributes}
-                tier={this.state.data.sub_label || false}
+                
               />
             </div>
 
@@ -105,19 +111,80 @@ class DetailsPane extends React.Component {
 function NoInformation() {
   return <div className="no-info" >No Infomation</div>;
 }
+function AppdData(props){
+	if(props.data.level == "grey"){
+	return null;
+	}
+	else if(props.data.name == "Node"){
+	return null;
+	}
+	else{
+		let rows = []
+		
+		if(props.data.name == "AppProf"){
+			 rows = (
+			[<tr>
+		<td width="30%">Name</td><td width="70%">{props.data.label}</td>
+		</tr>,
+		<tr>
+		<td width="30%">App-Health</td><td width="70%">{props.data.attributes["App-Health"]}</td>
+		</tr>,
+		
+		]
+			)
+		}
+		else{
+			 rows = (
+			[<tr>
+		<td width="30%">Tier</td><td width="70%">{props.data.label}</td>
+		</tr>,
+		<tr>
+		<td width="30%">Tier-Health</td><td width="70%">{props.data.attributes["Tier-Health"]}</td>
+		</tr>,
+		
+		]
+			)
+		}
+		return (
+		<div className="info-div">AppDynamics Information
+		<table className="info-table">
+		{
+		rows
+		}
+		</table>
+		</div>
+		)
+	}
+}
 function CardData(props) {
   console.log("Inside card");
   let newCard = [];
   return (
     <table className="info-table">
-      {props.tier ? (
+{props.name ?
         <tr>
-          <td>Tier</td>
-          <td>{props.tier}</td>
-        </tr>
-      ) : null}
+          <td width="30%">Name</td>
+          <td width="70%">{props.name}</td>
+        </tr> : null
+      }     
+	 {	props.level == "grey" ? 
+	
+			(
+			
+			
+				<tr>
+				<td width="30%" className="bold-font">MAC</td>
+				<td width="70%" className="bold-font">IP</td>
+				
+				</tr>
+			) : null
+		
+	}
       {Object.keys(props.attributes).map(key => {
-        if (
+		  if(key == "App-Health" || key == "Tier-Health"){
+		return null;
+		}
+        else if (
           typeof props.attributes[key] == "string" ||
           typeof props.attributes[key] == "number"
         ) {

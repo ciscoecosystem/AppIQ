@@ -33,7 +33,44 @@
         "descr": "Failed to form relation to MO uni/vmmp-VMware/dom-ESX1-Leaf102 of class infraDomP",
         "created": "2018-11-16T16:38:54.692-07:00"
       }];
-   
+	const TABLE_OPERATIONAL = [
+    {
+        Header: 'End Point',
+        accessor: 'ep_name'
+    },
+    {
+        Header: 'IP',
+        accessor: 'ip'
+    },
+    {
+        Header: 'MAC',
+        accessor: 'mac'
+    },
+    {
+        Header: 'Learning Resource',
+        accessor: 'learning_source'
+    },
+    {
+        Header: 'Hosting Server',
+        accessor: 'hosting_server_name'
+    },
+    {
+        Header: 'Reporting Controller Name',
+        accessor: 'ctrlr_name'
+    },
+    {
+        Header: 'Interface',
+        accessor: 'iface_name'
+    },
+    {
+        Header: "Multicast Address",
+        accessor: 'mcast_addr'
+    },
+    {
+        Header: 'Encap',
+        accessor: 'encap'
+    },
+]
     const TABLE_COLUMNS_FAULTS = [
         {
             Header: 'Severity',
@@ -109,4 +146,4 @@
                     accessor: 'created'
                 }];
                 
-export { ROWS_FAULTS, TABLE_COLUMNS_FAULTS,TABLE_COLUMNS_AUDIT_LOG,TABLE_COLUMNS_EVENTS}
+export { ROWS_FAULTS, TABLE_COLUMNS_FAULTS,TABLE_COLUMNS_AUDIT_LOG,TABLE_COLUMNS_EVENTS,TABLE_OPERATIONAL}

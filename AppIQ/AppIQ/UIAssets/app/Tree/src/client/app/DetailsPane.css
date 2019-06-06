@@ -1,15 +1,18 @@
 .overlay-pane {
   height: 100%;
-  width: 30%;
+  width: 300px;
   position: fixed;
   z-index: 1;
   top: 0;
   right: 0;
   /* background-color: rgb(0,0,0); */
-  background-color: rgb(226, 226, 226);
+  background-color: rgb(255, 255, 255);
   overflow-x: hidden;
   transition: 0.5s;
   box-shadow: 1px 1px 17px 0px;
+}
+.bold-font{
+font-weight : bold;
 }
 .overlay-pane td{
   border: 1px solid #dbdada
@@ -56,7 +59,7 @@ background: white;
 border-bottom: 1px solid rgb(199, 199, 199); 
 }
 .panel-body{
-background-color: #e6e6e6;
+background-color: #ffffff;
 height: inherit;
 margin-top:6px; 
 }
@@ -97,7 +100,7 @@ padding: 5px;
 .info-div{
 padding: 5px;   
 color: black;
-background: #f0efef;
+background: #ffffff;
 margin-top: 7px; 
 }
 .action-icons{

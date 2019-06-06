@@ -37,7 +37,7 @@ window.APIC_URL_TOKEN = getCookie("app_Cisco_AppIQ_urlToken");
 
 var headerInstanceName;
 
-function getData() {
+function getData(asyncCall) {
     var apicHeaders = new Headers();
 
     var urlToParse = location.search;
@@ -53,10 +53,10 @@ function getData() {
     let payload = { query: 'query{Run(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){response}}' }
     let xhr = new XMLHttpRequest();
     let url = document.location.origin + "/appcenter/Cisco/AppIQ/graphql.json";
-
+	
     try {
       console.log("opening post")
-        xhr.open("POST", url, false);
+        xhr.open("POST", url,false);
 
         xhr.setRequestHeader("Content-type", "application/json");
         xhr.setRequestHeader("DevCookie", window.APIC_DEV_COOKIE);
@@ -477,11 +477,20 @@ function getStaticData() {
 }
 
 function loadingBoxShow() {
-    document.getElementById("loading-box").style.display="visible";
+let health = document.getElementById("health-indicators")
+if(health){
+health.style.display= "none";
+}
+  document.getElementById("loading-box").style.display = "block";
+  console.log(document.getElementById("loading-box").style.display)
 }
 
 function loadingBoxHide() {
-    document.getElementById("loading-box").style.display="none";
+	let health = document.getElementById("health-indicators")
+if(health){
+health.style.display= "block";
+}
+  document.getElementById("loading-box").style.display = "none";
 }
 
 class App extends React.Component {
@@ -492,22 +501,25 @@ class App extends React.Component {
         }
 
         this.reload = this.reload.bind(this);
-        let myVar = setInterval(this.reload, 60000);
+       
     }
 
     reload() {
         // alert("Reloading");
-        // loadingBoxShow();
-        this.setState({
+        loadingBoxShow("block");
+
+        setTimeout( ()=>{
+			this.setState({
             reloadCount : this.state.reloadCount + 1,
         })
+		},10)
     }
     componentWillMount(){
       document.body.style.overflow = "scroll"
     }
     render() {
-        loadingBoxShow();
-        getData();
+        
+		getData();
         //getStaticData();
         loadingBoxHide();
         let apptext = " List of Applications";

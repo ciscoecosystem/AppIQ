@@ -254,8 +254,7 @@ export default class Node extends React.Component {
         className={nodeData._children ? "nodeBase" : "leafNodeBase"}
         transform={this.state.transform}
         onClick={this.handleClick}
-        onMouseOver={this.handleMouseIn}
-        onMouseOut={this.handleMouseOut}
+      
       >
         {(nodeStyle.circle.stroke = nodeData.level)}
         {(nodeStyle.circle.fill = nodeData.type)}

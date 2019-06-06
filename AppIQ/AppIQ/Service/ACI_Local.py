@@ -117,8 +117,11 @@ class ACI_Local(object):
                 mo_related_item_url = self.proto + self.apic_ip + "/api/node/class/healthRecord.json?query-target-filter=eq(healthRecord.affected,\"" + mo_dn + "\")"
             elif item_type == "ifConnRecords":
                 mo_related_item_url = self.proto + self.apic_ip + "/api/node/mo/uni/epp/fv-[" + mo_dn + "].json?" + item_query_string
+            elif item_type == "other_url":
+                mo_related_item_url = self.proto + self.apic_ip + item_query_string
             
             mo_related_item_resp = self.ACI_get(mo_related_item_url, cookie = {'APIC-Cookie': self.apic_token})
+            
             mo_related_item_list = ((json.loads(mo_related_item_resp.text)['imdata']))
             return mo_related_item_list
             # return {"status": True, "payload": mo_related_item_list}

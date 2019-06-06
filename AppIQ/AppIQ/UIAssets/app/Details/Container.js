@@ -1,5 +1,5 @@
 import React, { Component } from 'react'
-import Header from '../Header'
+import Header from './Header'
 import DetailsTable from './DetailsTable'
 import './style.css'
 import DataTable from "./DataTable"
