@@ -387,6 +387,7 @@ class AppD(object):
                                     violate = {'id': bt_tier_id,
                                                'bt': str(health_violations.get('entityMap').get(key1).get('name'))}
                                     violate_list.append(violate)
+                
                 if 'incidents' in health_violations:
                     for key2 in health_violations.get('incidents'):
                         for key3 in violate_list:

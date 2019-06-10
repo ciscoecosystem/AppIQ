@@ -527,6 +527,187 @@ def getConfiguredAccessPolicies(tn, ap, epg):
             "payload": []
         })
 
+
+def getToEpgTraffic(epg_dn):
+    """
+    Gets the Traffic Details from the given EPG to other EPGs
+    """
+    # getToEpgTraffic("uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-Ord")
+    aci_local_object = aci_local.ACI_Local("")
+
+    epg_traffic_query_string = 'query-target-filter=eq(vzFromEPg.epgDn,"' + epg_dn + '")&rsp-subtree=full&rsp-subtree-class=vzToEPg,vzRsRFltAtt,vzCreatedBy&rsp-subtree-include=required'
+    # epg_traffic_query_string = 'rsp-subtree=full&rsp-subtree-class=vzToEPg,vzRsRFltAtt,vzCreatedBy&rsp-subtree-include=required'
+    # /api/node/class/vzFromEPg.json?rsp-subtree=full&rsp-subtree-class=vzToEPg,vzRsRFltAtt,vzCreatedBy&rsp-subtree-include=required
+    epg_traffic_resp = aci_local_object.get_all_mo_instances("vzFromEPg", epg_traffic_query_string)
+    
+    if epg_traffic_resp["status"]:
+        epg_traffic_resp = epg_traffic_resp["payload"]
+
+        from_epg_dn = epg_dn
+        
+        to_epg_traffic_list = []
+        to_epg_traffic_set = set()
+
+        try:
+            for epg_traffic in epg_traffic_resp:
+                to_epg_children = epg_traffic["vzFromEPg"]["children"]
+
+                for to_epg_child in to_epg_children:
+                    # to_epg_traffic_dict = {
+                    #     "to_epg" : "",
+                    #     "contract_subj" : "",
+                    #     "filter_list" : [],
+                    #     "ingr_pkts" : "",
+                    #     "egr_pkts" : "",
+                    #     "epg_alias" : "",
+                    #     "contract_type" : ""
+                    # }
+                    
+                    vz_to_epg_child = to_epg_child["vzToEPg"]
+
+                    to_epg_dn = vz_to_epg_child["attributes"]["epgDn"]
+                    tn = to_epg_dn.split("/tn-")[1].split("/")[0]
+                    ap = to_epg_dn.split("/ap-")[1].split("/")[0]
+                    epg = to_epg_dn.split("/epg-")[1]
+                    
+                    parsed_to_epg_dn = tn + "/" + ap + "/" + epg
+
+                    # to_epg_traffic_dict["to_epg"] = parsed_to_epg_dn
+
+                    flt_attr_children = vz_to_epg_child["children"]
+
+                    for flt_attr in flt_attr_children:
+
+                        to_epg_traffic_dict = {
+                            "to_epg" : "",
+                            "contract_subj" : "",
+                            "filter_list" : [],
+                            "ingr_pkts" : "",
+                            "egr_pkts" : "",
+                            "epg_alias" : "",
+                            "contract_type" : ""
+                        }
+
+                        to_epg_traffic_dict["to_epg"] = parsed_to_epg_dn
+
+                        flt_attr_child = flt_attr["vzRsRFltAtt"]
+                        flt_attr_tdn = flt_attr_child["attributes"]["tDn"]
+
+                        traffic_id = parsed_to_epg_dn + "||" + flt_attr_tdn
+
+                        # Check if we have already encountered the filter for a particular destination EPG
+                        if traffic_id in to_epg_traffic_set:
+                            to_epg_traffic_set.add(traffic_id)
+                            continue
+                        
+                        flt_name = flt_attr_tdn.split("/fp-")[1]
+                        flt_attr_subj_dn = flt_attr_child["children"][0]["vzCreatedBy"]["attributes"]["ownerDn"]
+                        subj_dn = flt_attr_subj_dn.split("/rssubjFiltAtt-")[0]
+
+                        subj_tn = flt_attr_subj_dn.split("/tn-")[1].split("/")[0]
+                        subj_ctrlr = flt_attr_subj_dn.split("/brc-")[1].split("/")[0]
+                        subj_name = flt_attr_subj_dn.split("/subj-")[1].split("/")[0]
+
+                        contract_subject = subj_tn + "/" + subj_ctrlr + "/" + subj_name
+                        flt_list = []
+                        ingr_pkts = ""
+                        egr_pkts = ""
+                        flt_list = getFilterList(flt_attr_tdn, aci_local_object)
+                        ingr_pkts, egr_pkts = getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object)
+                                            
+                        to_epg_traffic_dict["contract_subj"] = contract_subject
+                        to_epg_traffic_dict["filter_list"] = flt_list
+                        to_epg_traffic_dict["ingr_pkts"] = ingr_pkts
+                        to_epg_traffic_dict["egr_pkts"] = egr_pkts
+
+                        to_epg_traffic_set.add(traffic_id)
+                        to_epg_traffic_list.append(to_epg_traffic_dict)
+
+            app.logger.info("=======to_epg_traffic_list==========" + str(to_epg_traffic_list))
+            
+            return json.dumps({
+                "status_code": "200",
+                "message": "",
+                "payload": to_epg_traffic_list
+            })
+
+        except Exception as ex:
+            app.logger.info("=======exception_to_epg_traffic_list==========" + str(ex))
+
+            return json.dumps({
+                "status_code": "300",
+                "message": str(ex),
+                "payload": []
+            })
+    else:
+        app.logger.info("Could not get Traffic Data related to EPG")
+        return json.dumps({
+            "status_code": "300",
+            "message": "Exception while fetching Traffic Data related to EPG",
+            "payload": []
+        })
+    
+
+
+def getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object):
+    """
+    Returns the Cumulative Ingress and Egress packets information for the last 15 minutes
+    """
+    cur_aggr_stats_query_url = "/api/node/mo/" + from_epg_dn + "/to-[" + to_epg_dn + "]-subj-[" + subj_dn + "]-flt-" + flt_name + "/CDactrlRuleHitAg15min.json"
+    cur_aggr_stats_list = aci_local_object.get_mo_related_item("", cur_aggr_stats_query_url, "other_url")
+    
+    if cur_aggr_stats_list:
+        cur_ag_stat_attr = cur_aggr_stats_list[0]["actrlRuleHitAg15min"]["attributes"]
+        ingr_pkts = cur_ag_stat_attr["ingrPktsCum"]
+        egr_pkts = cur_ag_stat_attr["egrPktsCum"]
+        return ingr_pkts, egr_pkts
+    else:
+        return "0", "0"
+
+
+def getFilterList(flt_dn, aci_local_object):
+    """
+    Returns the list of filters for a given destination EPG
+    """
+
+    flt_list = []
+    flt_entry_query_string = "query-target=children&target-subtree-class=vzRFltE"
+    flt_entries = aci_local_object.get_mo_related_item(flt_dn, flt_entry_query_string, "")
+
+    for flt_entry in flt_entries:
+        flt_attr = flt_entry["vzRFltE"]["attributes"]
+        
+        ether_type = flt_attr["etherT"]
+
+        if ether_type == "unspecified":
+            flt_list.append("*")
+            continue
+        
+        protocol = flt_attr["prot"] if flt_attr["prot"] != "unspecified" else "*"
+        src_from_port = flt_attr["sFromPort"]
+        src_to_port = flt_attr["sToPort"]
+        dest_from_port = flt_attr["dFromPort"]
+        dest_to_port = flt_attr["dToPort"]
+
+        # If Source From Port or Source To port is unspecified, set value of source to "*"
+        if src_from_port == "unspecified" or src_to_port == "unspecified":
+            src_str = "*"
+        else:
+            src_str = src_from_port + "-" + src_to_port
+        
+        # If Destination From Port or Destination To port is unspecified, set value of destination to "*"
+        if dest_from_port == "unspecified" or dest_to_port == "unspecified":
+            dest_str = "*"
+        else:
+            dest_str = dest_from_port + "-" + dest_to_port
+
+        flt_str = ether_type + ":" + protocol + ":" + src_str + " to " +dest_str
+
+        flt_list.append(flt_str)
+
+    return flt_list
+
+
 # This will be called from the UI - after the Mappings are completed
 @app.route('/enableView.json')
 def enableView(appid, bool):

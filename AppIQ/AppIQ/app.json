@@ -19,6 +19,7 @@
     "metaversion":"1.1",
     "name":"AppIQ",
     "permissions":[
+        "admin",
         "tenant-connectivity-mgmt",
         "tenant-connectivity-util",
         "tenant-connectivity-l2",

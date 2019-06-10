@@ -41,6 +41,9 @@ class GetOperationalInfo(graphene.ObjectType):
 class GetConfiguredAccessPolicies(graphene.ObjectType):
     accessPoliciesList = graphene.String()
 
+class GetToEpgTraffic(graphene.ObjectType):
+    toEpgTrafficList = graphene.String()
+
 class SetPollingInterval(graphene.ObjectType):
     status = graphene.String()
     message = graphene.String()
@@ -72,7 +75,7 @@ class Query(graphene.ObjectType):
     GetAuditLogs = graphene.Field(GetAuditLogs, dn=graphene.String())
     GetOperationalInfo = graphene.Field(GetOperationalInfo, dn = graphene.String(), moType = graphene.String(), ipList = graphene.String())
     GetConfiguredAccessPolicies = graphene.Field(GetConfiguredAccessPolicies, tn = graphene.String(), ap = graphene.String(), epg = graphene.String())
-
+    GetToEpgTraffic = graphene.Field(GetToEpgTraffic, dn = graphene.String())
     SetPollingInterval = graphene.Field(SetPollingInterval, interval = graphene.String())
 
     # EnableView = graphene.Field(EnableView,view=graphene.String())
@@ -97,6 +100,10 @@ class Query(graphene.ObjectType):
     def resolve_GetConfiguredAccessPolicies(self, info, tn, ap, epg):
         GetConfiguredAccessPolicies.accessPoliciesList = app.getConfiguredAccessPolicies(tn, ap, epg)
         return GetConfiguredAccessPolicies
+
+    def resolve_GetToEpgTraffic(self, info, dn):
+        GetToEpgTraffic.toEpgTrafficList = app.getToEpgTraffic(dn)
+        return GetToEpgTraffic
 
     def resolve_SetPollingInterval(self, info, interval):
         status, message = app.setPollingInterval(interval)

@@ -136,8 +136,9 @@ class ACI_Local(object):
             mo_url = self.proto + self.apic_ip + "/api/node/class/" + mo_class + ".json"
             if (query_string != ""):
                 mo_url += "?" + query_string
-            
+            current_app.logger.info("=====mo_url=======" + mo_url)
             mo_resp = self.ACI_get(mo_url, cookie = {'APIC-Cookie': self.apic_token})
+            current_app.logger.info("=====mo_resp=======" + mo_resp.text)
             mo_instance_list = ((json.loads(mo_resp.text)['imdata']))
             return {"status": True, "payload": mo_instance_list}
         except Exception as ex:
