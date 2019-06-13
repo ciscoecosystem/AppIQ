@@ -122,19 +122,6 @@ class ClusterList extends React.Component {
         const clusterType = (this.props.type == "source") ? "Source Endpoints" : "Target Endpoints";
         const isSourceRecommended = (this.props.type == "source") ? ' - Recommended' : "";
 
-        let listElement = null;
-        if(processedList.length == 0) {
-            if(this.props.type == "source") {
-                listElement = <center><br/><div className = "ul-out"><div className="no-element-found">No Endpoints found for the given Application in the given Tenant.</div></div></center>
-            } else {
-                listElement = <div className = "ul-out"></div>;
-            }
-        } else {
-            listElement = <ul className="ul-out">
-                    {processedList}
-                </ul>
-        }
-
         return (
             <div>
                 <div className="cluster-header">{clusterType}</div>
@@ -147,9 +134,9 @@ class ClusterList extends React.Component {
                 :
                 <p>Displaying <b>{processedList.length}</b> out of {this.props.listData.length} clusters {isSourceRecommended}</p>
                 }
-
-                {listElement}
-
+                <ul className="ul-out">
+                    {processedList}
+                </ul>
             </div>
         );
     }

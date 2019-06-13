@@ -512,13 +512,45 @@ def getConfiguredAccessPolicies(tn, ap, epg):
             cap_dict["vlan_pool"] = cap_attr["vLanPool"].split("/from-")[1]
 
             cap_list.append(cap_dict)
-        
-        app.logger.info("====cap_list====" + str(cap_list))
-
+            
         return json.dumps({
             "status_code": "200",
             "message": "",
             "payload": cap_list
+        })
+    except Exception as ex:
+        return json.dumps({
+            "status_code": "300",
+            "message": str(ex),
+            "payload": []
+        })
+
+
+def getSubnets(dn):
+    """
+    Gets the Subnets Information for an EPG
+    """
+    aci_local_object = aci_local.ACI_Local("")
+
+    subnet_query_string = "query-target=children&target-subtree-class=fvSubnet"
+
+    subnet_resp = aci_local_object.get_mo_related_item(dn, subnet_query_string, "")
+    subnet_list = []
+    try:
+        for subnet in subnet_resp:
+            subnet_dict = {
+                "ip" : "",
+                "to_epg" : "",
+                "epg_alias" : ""
+            }
+            subnet_attr = subnet["fvSubnet"]["attributes"]
+            subnet_dict["ip"] = subnet_attr["ip"]
+            subnet_list.append(subnet_dict)
+        
+        return json.dumps({
+            "status_code": "200",
+            "message": "",
+            "payload": subnet_list
         })
     except Exception as ex:
         return json.dumps({
@@ -553,15 +585,6 @@ def getToEpgTraffic(epg_dn):
                 to_epg_children = epg_traffic["vzFromEPg"]["children"]
 
                 for to_epg_child in to_epg_children:
-                    # to_epg_traffic_dict = {
-                    #     "to_epg" : "",
-                    #     "contract_subj" : "",
-                    #     "filter_list" : [],
-                    #     "ingr_pkts" : "",
-                    #     "egr_pkts" : "",
-                    #     "epg_alias" : "",
-                    #     "contract_type" : ""
-                    # }
                     
                     vz_to_epg_child = to_epg_child["vzToEPg"]
 
@@ -571,8 +594,6 @@ def getToEpgTraffic(epg_dn):
                     epg = to_epg_dn.split("/epg-")[1]
                     
                     parsed_to_epg_dn = tn + "/" + ap + "/" + epg
-
-                    # to_epg_traffic_dict["to_epg"] = parsed_to_epg_dn
 
                     flt_attr_children = vz_to_epg_child["children"]
 
@@ -623,7 +644,7 @@ def getToEpgTraffic(epg_dn):
                         to_epg_traffic_set.add(traffic_id)
                         to_epg_traffic_list.append(to_epg_traffic_dict)
 
-            app.logger.info("=======to_epg_traffic_list==========" + str(to_epg_traffic_list))
+            # app.logger.info("=======to_epg_traffic_list==========" + str(to_epg_traffic_list))
             
             return json.dumps({
                 "status_code": "200",
@@ -632,7 +653,7 @@ def getToEpgTraffic(epg_dn):
             })
 
         except Exception as ex:
-            app.logger.info("=======exception_to_epg_traffic_list==========" + str(ex))
+            app.logger.info("Exception while fetching To EPG Traffic List : \n" + str(ex))
 
             return json.dumps({
                 "status_code": "300",
@@ -646,7 +667,6 @@ def getToEpgTraffic(epg_dn):
             "message": "Exception while fetching Traffic Data related to EPG",
             "payload": []
         })
-    
 
 
 def getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object):
@@ -877,10 +897,16 @@ def get_details(tenant, appId):
 
         for each in merged_data:
             epg_health = aci_local_object.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
-            details_list.append(
-                {'IP':each['IP'],'epgName': each['EPG'], 'epgHealth': epg_health, 'endPointName': each['VM-Name'],
+            details_list.append({
+                'IP': each['IP'],
+                'epgName': each['EPG'],
+                'epgHealth': epg_health,
+                'endPointName': each['VM-Name'],
                 'tierName': each['tierName'],
-                'tierHealth': each['tierHealth']})
+                'tierHealth': each['tierHealth'],
+                'dn': each['dn']
+            })
+        
         details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
         return json.dumps({"instanceName":getInstanceName(),"payload": details, "status_code": "200", "message": "OK"})
     except Exception as e:

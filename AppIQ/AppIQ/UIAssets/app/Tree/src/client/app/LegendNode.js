@@ -29,7 +29,7 @@ export default class LegendNode extends React.Component {
                     this.node = n;
                 }}
                 style={this.state.initialStyle}
-                className={'leafNodeBase1'}
+                className={'leafNodeBase'}
                 onClick={this.props.onClick}
                 transform={"translate(" + this.props.translate.x + "," + this.props.translate.y +")"}
             >
@@ -71,16 +71,16 @@ export default class LegendNode extends React.Component {
                         {this.props.nodeData.label}
                     </text> : ""}
 
-                {this.props.nodeData.sub_label ?
+                {this.props.sub_label ?
                     <text
-                        className="nodeAttributesBase"
+                        className="nodeSubLabel"
                         y={textLayout.y + 35}
                         textAnchor={textLayout.textAnchor}
                         transform={textLayout.transform}
                         //style={nodeStyle.attributes}
                         dy='10'
                     >
-                        {this.props.nodeData.sub_label }
+                        {"(" + this.props.sub_label + ")"}
                     </text> : ""}
 
             </g>

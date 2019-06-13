@@ -1,11 +1,11 @@
 import React from 'react'
-
+import AppInfo from './AppInfo'
 import Toolbar from './Toolbar'
+import { strictEqual } from 'assert';
+import { stringify } from 'querystring';
 import Header from './Header'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import AppTable from "./AppTable"
-import './style.css'
 
 function getCookieVal(offset) {
     var endstr = document.cookie.indexOf(";", offset);
@@ -50,7 +50,7 @@ class Container extends React.Component {
         super(props);
         this.sortField = "appProfileName";
         this.sortType = "asc";
-        var urlToParse = window.location.search;
+        var urlToParse = location.search;
         let urlParams = {};
         urlToParse.replace(
             new RegExp("([^?=&]+)(=([^&]*))?", "g"),
@@ -60,20 +60,17 @@ class Container extends React.Component {
         );
         let result = urlParams;
 
-         const rx = /Tenants:(.*)\|/g;
-         const topUrl = window.top.location;
-         const tenantNames = rx.exec(topUrl);
-        
-         this.tenantName = tenantNames[1];
+        const rx = /Tenants:(.*)\|/g;
+        const topUrl = top.location;
+        const tenantNames = rx.exec(topUrl);
+
+        this.tenantName = tenantNames[1];
 
         this.notify = this.notify.bind(this);
         this.getData = this.getData.bind(this);
-        this.getStaticData = this.getStaticData.bind(this);
 
         this.getData();
-         //this.getStaticData();
         this.state = {
-            load : false,
             "jsonData": jsonData
         }
 
@@ -90,7 +87,7 @@ class Container extends React.Component {
         localStorage.removeItem('message')
         }
 
-        //let reloader = setInterval(this.reloading, 30000);
+        let reloader = setInterval(this.reloading, 30000);
     }
 
     shouldComponentUpdate(nextProps, nextState) {
@@ -145,22 +142,6 @@ class Container extends React.Component {
         }
     }
 
-    getStaticData() {
-        jsonData =  [
-            {
-                "health": "NORMAL",
-                "appProfileName": "TestApplication1",
-                "isViewEnabled": true,
-                "appId": 9
-            },
-            {
-                "health": "NORMAL",
-                "appProfileName": "EComm-NPM-Demo",
-                "isViewEnabled": true,
-                "appId": 13
-            }
-        ];
-    }
 
     /**
     * @param {string} theUrl The URL of the REST API
@@ -185,9 +166,68 @@ class Container extends React.Component {
           });
     }
 
+    /**
+    *@param {object} sortData object to sort
+    *@param {string} sortField The name of field to sort with
+    *@return {object} the sorted object
+    */
+    sortTable(sortDataObject, sortField) {
+        console.log(sortDataObject);
+        let sortData = sortDataObject;
+
+        if (this.sortField == sortField) {
+            /* toggle asc/desc */
+            this.sortType = (this.sortType) == "asc" ? "desc" : "asc";
+
+            /* sort according to new asc/desc */
+            if (this.sortType == "asc") {
+                sortData.sort(function (a, b) {
+                    if (a[sortField] < b[sortField]) {
+                        return -1;
+                    }
+                    if (a[sortField] > b[sortField]) {
+                        return 1;
+                    }
+                    return -1;
+                });
+            }
+            else {
+                sortData.sort(function (a, b) {
+                    if (a[sortField] > b[sortField]) {
+                        return -1;
+                    }
+                    if (a[sortField] < b[sortField]) {
+                        return 1;
+                    }
+
+                    // names must be equal
+                    return -1;
+                });
+            }
+        }
+        else {
+            /* sort with sortField in asc : set this.sortType to asc */
+            this.sortField = sortField;
+            this.sortType = "asc";
+            sortData.sort(function (a, b) {
+                if (a[sortField] < b[sortField]) {
+                    return -1;
+                }
+                if (a[sortField] > b[sortField]) {
+                    return 1;
+                }
+                return -1;
+            });
+        }
+
+        sortDataObject = sortData;
+        this.setState({
+            'jsonData': sortDataObject
+        });
+    }
 
     reloading() {
-        var urlToParse = window.location.search;
+        var urlToParse = location.search;
         let urlParams = {};
         urlToParse.replace(
             new RegExp("([^?=&]+)(=([^&]*))?", "g"),
@@ -202,8 +242,6 @@ class Container extends React.Component {
 
         this.getData();
 
-        // this.getStaticData();
-
         this.setState({
             "jsonData": jsonData
         })
@@ -212,33 +250,39 @@ class Container extends React.Component {
     handleLoginClick() {
         window.location.href = "login.html?reset=1";
     }
-   
+
     render() {
         /* retrieve JSON data into 'data' */
         let data = this.state.jsonData;
         /* generate list of AppInfo components with data as props */
         const list = data;
-        console.log("list data")
-        console.log(list)
-        
-        
-        
-            return (
-             
-                <div style={{minWidth:"950px"}}>
-                    <Header text=" List of Applications" applinktext="" instanceName={headerInstanceName}/>
-                    <Toolbar onReload={this.reloading} />
-              
-                    <AppTable rows={list} tenantName={this.tenantName}></AppTable>
-                    <br/>
-              <ToastContainer />
-                </div>
-            )
+        let odd = false;
+        let idCounter = 0;
+        let appInfoList = list.map((item) => {
+            odd = odd == false ? true : false;
+            idCounter = idCounter + 1;
+            return <AppInfo data={item} key={idCounter} highlight={odd} tenantName={this.tenantName} />
+        })
 
-        
-       
 
-        
+
+        return (
+            <div>
+                <Header text=" List of Applications" applinktext="" instanceName={headerInstanceName}/>
+                <Toolbar onReload={this.reloading} />
+                <table className="info-table" border="0" width="100%">
+                    <th className="sortable" onClick={() => { this.sortTable(data, "appProfileName") }}>Application Name</th>
+                    <th className="sortable" onClick={() => { this.sortTable(data, "health") }}>Health</th>
+                    <th></th>
+                    <th></th>
+                    <tbody>
+                        {appInfoList}
+                    </tbody>
+                </table>
+                <br/>
+          <ToastContainer />
+            </div>
+        )
     }
 }
 

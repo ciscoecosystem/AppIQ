@@ -37,7 +37,7 @@ window.APIC_URL_TOKEN = getCookie("app_Cisco_AppIQ_urlToken");
 
 var headerInstanceName;
 
-function getData(asyncCall) {
+function getData() {
     var apicHeaders = new Headers();
 
     var urlToParse = location.search;
@@ -53,15 +53,14 @@ function getData(asyncCall) {
     let payload = { query: 'query{Run(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){response}}' }
     let xhr = new XMLHttpRequest();
     let url = document.location.origin + "/appcenter/Cisco/AppIQ/graphql.json";
-	
+
     try {
-      console.log("opening post")
-        xhr.open("POST", url,false);
+        xhr.open("POST", url, false);
 
         xhr.setRequestHeader("Content-type", "application/json");
         xhr.setRequestHeader("DevCookie", window.APIC_DEV_COOKIE);
         xhr.setRequestHeader("APIC-challenge", window.APIC_URL_TOKEN);
-        console.log("header set")
+
         xhr.onreadystatechange = function () {
             if (xhr.readyState == 4){
                 if(xhr.status == 200) {
@@ -103,7 +102,6 @@ function getData(asyncCall) {
                 }
             }
         }
-        console.log("sending post")
         xhr.send(JSON.stringify(payload));
     }
     catch(except) {
@@ -120,377 +118,17 @@ function getData(asyncCall) {
 }
 
 function getStaticData() {
-    let rawData = [
-        {
-          "name": "AppProf",
-          "level": "seagreen",
-          "sub_label": "AppD-AppProfile1", 
-          "label": "EComm-NPM-Demo", 
-          "attributes": {
-            "App-Health": "CRITICAL"
-          },
-          "type": "#581552", 
-          "children": [
-            {
-              "name": "EPG",
-              "level": "seagreen", 
-              "sub_label": "AppD-Ord", 
-              "label": "Order-Tier", 
-              "fraction": 2, 
-              "attributes": {
-                "BD": "AppD-BD1",
-                "Contracts": [
-                  {
-                    "Provider": "controller"
-                  },
-                  {
-                    "Provider": "default"
-                  },
-                  {
-                    "Consumer": "controller"
-                  },
-                  {
-                    "Consumer": "default"
-                  },
-                  {
-                    "Consumer": "test"
-                  }
-                ],
-                "VMM-Domain": "ESX0-leaf102",
-                "Tier-Health": "NORMAL",
-                "VRF": "AppDynamics/AppD-VRF",
-                "Nodes": [
-                  "ORD-N1_0",
-                  "ORD-N1_1"
-                ]
-              },
-              "type": "#085A87",
-              "children": [
-                {
-                  "name": "EP",
-                  "level": "seagreen",
-                  "sub_label": "AppD-Ord-1_1", 
-                  "label": "Order-Tier", 
-                  "attributes": {
-                    "Tier-Health": "NORMAL",
-                    "IP": "192.168.128.18",
-                    "Interfaces": [
-                      "topology/pod-1/paths-102/pathep-[     eth1/6   ]"
-                    ],
-                    "HealthRuleViolations": [
-                      
-                    ],
-                    "ServiceEndpoints": [
-                      {
-                        "sepName": "/order/rest",
-                        "sepId": 534,
-                        "Errors/Min": "0.0",
-                        "ErrorPercentage": "0.0",
-                        "TotalErrors": "0",
-                        "Type": "SERVLET"
-                      }
-                    ]
-                  },
-                  "type": "#2DBBAD",
-                  "children": [
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "ORD-N1_0",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    },
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "ORD-N1_1",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    }
-                  ]
-                },
-                {
-                  "fractions": 2,
-                  "name": "EP",
-                  "level": "grey",
-                  "sub_label": "",
-                  "label": "",
-                  "attributes": {
-                    "00: 50: 56: 89: 2F: 28": "192.168.128.17",
-                    "00: 50: 56: 89: E0: 1C": "192.168.128.20"
-                  },
-                  "type": "grey"
-                }
-              ]
-            },
-            {
-              "name": "EPG",
-              "level": "seagreen",
-              "sub_label": "Appd-Inv-Data",
-              "label": "Inv-Tier",
-              "fraction": 0,
-              "attributes": {
-                "BD": "AppD-BD1",
-                "Contracts": [
-                  {
-                    "Provider": "default"
-                  },
-                  {
-                    "Provider": "controller"
-                  },
-                  {
-                    "Consumer": "default"
-                  },
-                  {
-                    "Consumer": "controller"
-                  }
-                ],
-                "VMM-Domain": "ESX1-Leaf102",
-                "Tier-Health": "NORMAL",
-                "VRF": "AppDynamics/AppD-VRF",
-                "Nodes": [
-                  "INV-N1_0",
-                  "INV-N1_1"
-                ]
-              },
-              "type": "#085A87",
-              "children": [
-                {
-                  "name": "EP",
-                  "level": "seagreen",
-                  "sub_label": "AppD-Inv",
-                  "label": "Inv-Tier",
-                  "attributes": {
-                    "Tier-Health": "NORMAL",
-                    "IP": "192.168.128.21",
-                    "Interfaces": [
-                      "topology/pod-1/paths-102/pathep-[     eth1/5   ]"
-                    ],
-                    "HealthRuleViolations": [
-                      
-                    ],
-                    "ServiceEndpoints": [
-                      {
-                        "sepName": "/cart/services",
-                        "sepId": 530,
-                        "Errors/Min": "0.0",
-                        "ErrorPercentage": "0.0",
-                        "TotalErrors": "0",
-                        "Type": "SERVLET"
-                      }
-                    ]
-                  },
-                  "type": "#2DBBAD",
-                  "children": [
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "INV-N1_0",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    },
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "INV-N1_1",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "EPG",
-              "level": "seagreen",
-              "sub_label": "AppD-Payment",
-              "label": "Payment-Tier",
-              "fraction": 1,
-              "attributes": {
-                "BD": "AppD-BD1",
-                "Contracts": [
-                  {
-                    "Provider": "default"
-                  }
-                ],
-                "VMM-Domain": "ESX0-leaf103",
-                "Tier-Health": "NORMAL",
-                "VRF": "AppDynamics/AppD-VRF",
-                "Nodes": [
-                  "PAY-N2_0"
-                ]
-              },
-              "type": "#085A87",
-              "children": [
-                {
-                  "name": "EP",
-                  "level": "seagreen",
-                  "sub_label": "AppD-Pay2",
-                  "label": "Payment-Tier",
-                  "attributes": {
-                    "Tier-Health": "NORMAL",
-                    "IP": "192.168.128.161",
-                    "Interfaces": [
-                      "topology/pod-1/paths-103/pathep-[     eth1/6   ]"
-                    ],
-                    "HealthRuleViolations": [
-                      
-                    ],
-                    "ServiceEndpoints": [
-                      {
-                        "sepName": "/paymentgateway/store",
-                        "sepId": 525,
-                        "Errors/Min": "0.0",
-                        "ErrorPercentage": "0.0",
-                        "TotalErrors": "0",
-                        "Type": "SERVLET"
-                      }
-                    ]
-                  },
-                  "type": "#2DBBAD",
-                  "children": [
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "PAY-N2_0",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    }
-                  ]
-                },
-                {
-                  "fractions": 1,
-                  "name": "EP",
-                  "level": "grey",
-                  "sub_label": "",
-                  "label": "",
-                  "attributes": {
-                    "00: 50: 56: 89: A7: 8E": "192.168.128.15"
-                  },
-                  "type": "grey"
-                }
-              ]
-            },
-            {
-              "name": "EPG",
-              "level": "seagreen",
-              "sub_label": "Appd-Ecom-Data",
-              "label": "Ecom-Tier",
-              "fraction": 0,
-              "attributes": {
-                "BD": "AppD-BD1",
-                "Contracts": [
-                  {
-                    "Provider": "default"
-                  },
-                  {
-                    "Provider": "controller"
-                  },
-                  {
-                    "Consumer": "default"
-                  },
-                  {
-                    "Consumer": "controller"
-                  }
-                ],
-                "VMM-Domain": "ESX1-Leaf102",
-                "Tier-Health": "NORMAL",
-                "VRF": "AppDynamics/AppD-VRF",
-                "Nodes": [
-                  "ECOM-N1_0",
-                  "ECOM-N1_1"
-                ]
-              },
-              "type": "#085A87",
-              "children": [
-                {
-                  "name": "EP",
-                  "level": "seagreen",
-                  "sub_label": "AppD-Ecom-1",
-                  "label": "Ecom-Tier",
-                  "attributes": {
-                    "Tier-Health": "NORMAL",
-                    "IP": "192.168.128.13",
-                    "Interfaces": [
-                      "topology/pod-1/paths-102/pathep-[     eth1/5   ]"
-                    ],
-                    "HealthRuleViolations": [
-                      
-                    ],
-                    "ServiceEndpoints": [
-                      {
-                        "sepName": "/appdynamicspilot/rest",
-                        "sepId": 526,
-                        "Errors/Min": "0.0",
-                        "ErrorPercentage": "0.0",
-                        "TotalErrors": "0",
-                        "Type": "SERVLET"
-                      },
-                      {
-                        "sepName": "/",
-                        "sepId": 591,
-                        "Errors/Min": "0.0",
-                        "ErrorPercentage": "0.0",
-                        "TotalErrors": "0",
-                        "Type": "SERVLET"
-                      }
-                    ]
-                  },
-                  "type": "#2DBBAD",
-                  "children": [
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "ECOM-N1_1",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    },
-                    {
-                      "attributes": {
-                        "Node-Health": "NORMAL"
-                      },
-                      "label": "ECOM-N1_0",
-                      "type": "#C5D054",
-                      "name": "Node",
-                      "level": "seagreen"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        }
-      ];
+    var rawData = [
+    ];
     treedata = rawData;
 }
 
 function loadingBoxShow() {
-let health = document.getElementById("health-indicators")
-if(health){
-health.style.display= "none";
-}
-  document.getElementById("loading-box").style.display = "block";
-  console.log(document.getElementById("loading-box").style.display)
+    document.getElementById("loading-box").style.display="visible";
 }
 
 function loadingBoxHide() {
-	let health = document.getElementById("health-indicators")
-if(health){
-health.style.display= "block";
-}
-  document.getElementById("loading-box").style.display = "none";
+    document.getElementById("loading-box").style.display="none";
 }
 
 class App extends React.Component {
@@ -501,26 +139,20 @@ class App extends React.Component {
         }
 
         this.reload = this.reload.bind(this);
-       
+        let myVar = setInterval(this.reload, 60000);
     }
 
     reload() {
         // alert("Reloading");
-        loadingBoxShow("block");
-
-        setTimeout( ()=>{
-			this.setState({
+        // loadingBoxShow();
+        this.setState({
             reloadCount : this.state.reloadCount + 1,
         })
-		},10)
     }
-    componentWillMount(){
-      document.body.style.overflow = "scroll"
-    }
+
     render() {
-        
-		getData();
-        //getStaticData();
+        loadingBoxShow();
+        getData();
         loadingBoxHide();
         let apptext = " List of Applications";
         let title = " | View"

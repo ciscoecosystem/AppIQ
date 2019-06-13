@@ -1,7 +1,7 @@
-import React, {Component} from 'react'
+import React from 'react'
 import './style.css'
-import {IconButton} from "blueprint-react"
-class ToolBar extends Component {
+
+class ToolBar extends React.Component {
     constructor(props) {
        super(props) 
        console.log("ToolBar : " + props.onReload);
@@ -9,16 +9,9 @@ class ToolBar extends Component {
     
     render() {
         return (
-            <div className="row toolbar no-gutters">
-            <div className="col-md-12">
-                  <IconButton
-           className="pull-right"
-            type="btn--icon btn--gray-ghost"
-            size="btn--small"
-            icon="icon-refresh"
-            onClick={this.props.onReload}
-          /></div>
-            </div> 
+            <div className="toolbar">
+                <a onClick={this.props.onReload} className="icon-refresh" style={{color : "black", cursor : 'pointer'}} aria-hidden="true"></a>
+            </div>
         )
     }
 }

@@ -1,7 +1,5 @@
 import React from 'react'
 import './style.css'
-import {Input} from "blueprint-react"
-import {IconButton,Button} from "blueprint-react"
 
 class App extends React.Component {
     constructor(props) {
@@ -9,20 +7,10 @@ class App extends React.Component {
     }
 
     render() {
-		return (
-            <div className="row toolbar no-gutters">
-			<div className="col-md-12">
-               <IconButton
-           className="pull-right"
-            type="btn--icon btn--gray-ghost"
-            size="btn--small"
-            icon="icon-refresh"
-            onClick={this.props.onReload}
-
-          />
-		  </div>
-         </div>
-     
+        return (
+            <div className="toolbar">
+                <a onClick={this.props.onReload} className="icon-refresh" style={{ color: "black", cursor: 'pointer' }} aria-hidden="true"></a>
+            </div>
         )
     }
 }

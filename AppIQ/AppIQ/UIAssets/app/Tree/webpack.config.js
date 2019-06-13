@@ -32,7 +32,7 @@ var config = {
                 test: /\.css$/,
                 loaders: ['style-loader', 'css-loader'],
             },
-          {
+            {
                 test: /\.(png|jpg|gif|svg|eot|ttf|woff|woff2)$/,
                 loader: 'url-loader?limit=10000&name=[name].[ext]',
             }

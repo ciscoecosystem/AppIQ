@@ -71,7 +71,7 @@ class DetailsTable extends React.Component {
                     <tbody>
                     <tr className="th-header">
                         <td></td>
-                        <td colSpan="3">
+                        <td colSpan="2">
                             <center><div className="th-header-inside">EPG</div></center>
                         </td>
                         <td colSpan="2">
