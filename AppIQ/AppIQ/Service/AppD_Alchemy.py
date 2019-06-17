@@ -77,10 +77,13 @@ class HealthViolations(Base):
     description = Column(String)
     severity = Column(String)
     timestamp = Column(DateTime)
+    endTime = Column(String)
+    status = Column(String)
+    evaluationStates = Column(PickleType)
     tierId = Column(Integer, ForeignKey('Tiers.tierId'))
     appId = Column(Integer, ForeignKey('Application.appId'))
     # violationId, startTime, businessTransaction,description,severity,tierId,appId
-    def __init__(self, violationId, startTime, businessTransaction, description, severity, tierId, appId, timestamp):
+    def __init__(self, violationId, startTime, businessTransaction, description, severity, tierId, appId, timestamp, endTime, status, evaluationStates):
         self.violationId = violationId
         self.startTime = startTime
         self.businessTransaction = businessTransaction
@@ -89,6 +92,9 @@ class HealthViolations(Base):
         self.tierId = tierId
         self.appId = appId
         self.timestamp = timestamp
+        self.endTime = endTime
+        self.status = status
+        self.evaluationStates = evaluationStates
 
 
 class Nodes(Base):
@@ -297,7 +303,7 @@ class Database():
 
             if table == 'HealthViolations':
                 # violationId, startTime, businessTransaction,description,severity,tierId,appId
-                self.session.add(HealthViolations(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]))
+                self.session.add(HealthViolations(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10]))
 
             if table == 'ACItemp':
                 # IP, dn, appId, selector (0 or 1)
@@ -520,6 +526,40 @@ class Database():
                     action = "Inserting"
                     apSummaryRecord = ApSummary(apDn = key, apEpgs = data[0], apUsegEpgs = data[1], timestamp = data[2])
                     self.session.add(apSummaryRecord)
+            elif table == "HealthViolations":
+                recordExists = self.session.query(exists().where(HealthViolations.violationId == key)).scalar()
+                
+                if recordExists:
+                    data_dict = {
+                        "startTime": data[0],
+                        "businessTransaction": data[1],
+                        "description": data[2],
+                        "severity": data[3],
+                        "tierId": data[4],
+                        "appId": data[5],
+                        "timestamp": data[6],
+                        "endTime": data[7],
+                        "status": data[8],
+                        "evaluationStates": data[9],
+                    }
+                    action = "Updating"
+                    self.session.query(HealthViolations).filter(HealthViolations.violationId == key).update(data_dict)
+                else:
+                    action = "Inserting"
+                    healthViolationRecord = HealthViolations(
+                        violationId = key,
+                        startTime = data[0],
+                        businessTransaction = data[1],
+                        description = data[2],
+                        severity = data[3],
+                        tierId = data[4],
+                        appId = data[5],
+                        timestamp = data[6],
+                        endTime = data[7],
+                        status = data[8],
+                        evaluationStates = data[9]
+                    )
+                    self.session.add(healthViolationRecord)
                     
             self.commitSession()
 

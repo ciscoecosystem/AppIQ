@@ -862,9 +862,18 @@ def getappD(appId, ep):
                 hevs = database_object.returnHealthViolations('tierId', tier.tierId)
                 for hev in hevs:
                     if (int(hev.violationId) >= 0):
-                        hevList.append({"Violation Id": (hev.violationId), "Start Time": str(hev.startTime),
-                                        'Affected Object': str(hev.businessTransaction),
-                                        'Description': str(hev.description), 'Severity': str(hev.severity)})
+                        hevList.append(
+                            {
+                                "Violation Id": (hev.violationId),
+                                "Start Time": str(hev.startTime),
+                                'Affected Object': str(hev.businessTransaction),
+                                'Description': str(hev.description),
+                                'Severity': str(hev.severity),
+                                'End Time': str(hev.endTime),
+                                'Status': str(hev.status),
+                                'Evaluation States': hev.evaluationStates["evaluationStates"]
+                            }
+                        )
                 nodes = database_object.returnNodes('tierId', tier.tierId)
                 #print "hevList"
                 #print hevList

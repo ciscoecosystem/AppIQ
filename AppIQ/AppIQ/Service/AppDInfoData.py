@@ -396,14 +396,49 @@ class AppD(object):
                                         'id']:
                                 violation_startTime = key2['startTime']
 
-                                startTime = time.strftime('%Y-%m-%d %H:%M:%S',
-                                                          time.localtime(int(str(violation_startTime)) / 1000))
+                                startTime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(str(violation_startTime)) / 1000))
+                                
+                                violation_end_time = int(str(key2['endTime']))
+                                
+                                end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(violation_end_time / 1000)) if violation_end_time != -1 else ""
+                                
                                 description = key2['description']
                                 severity = key2['severity']
-                                final_violate_list.append({'Description': str(description), 'Severity': str(severity),
-                                                           'Violation Id': int(key3['id']),
-                                                           'Affected Object': key3['bt'],
-                                                           'Start Time': str(startTime)})
+
+                                status = key2['status']
+                                eval_states_list = []
+                                eval_states = key2["evaluationStates"]
+
+                                # Get List of Evaluation States
+                                for state in eval_states:
+                                    eval_state = {
+                                        "Severity": state["severity"],
+                                        "Description": state["description"],
+                                        "Start Time": "",
+                                        "End Time": "",
+                                        "Summary": state["summary"]
+                                    }
+                                    eval_start_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(str(state["startTime"])) / 1000))
+
+                                    eval_end_time = state["endTime"]
+                                    eval_end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(str(eval_end_time)) / 1000)) if eval_end_time else ""
+                                    
+                                    eval_state["Start Time"] = eval_start_time
+                                    eval_state["End Time"] = eval_end_time
+                                    eval_states_list.append(eval_state)
+                                    
+                                final_violate_list.append(
+                                    {
+                                        'Description': str(description),
+                                        'Severity': str(severity),
+                                        'Violation Id': int(key3['id']),
+                                        'Affected Object': key3['bt'],
+                                        'Start Time': str(startTime),
+                                        'End Time': str(end_time),
+                                        'Status': status,
+                                        "Evaluation States": eval_states_list
+                                    }
+                                )
             else:
                 return []
             return final_violate_list
@@ -676,13 +711,14 @@ class AppD(object):
                                     if tierViolations:
                                         try:
                                             for violations in tierViolations:
-                                                self.databaseObject.checkIfExistsandUpdate('HealthViolations',
-                                                                                           [violations.get('Violation Id'),
-                                                                                            violations.get('Start Time'),
-                                                                                            violations.get('Affected Object'),
-                                                                                            violations.get('Description'),
-                                                                                            violations.get('Severity'),
-                                                                                            tier.get('id'), app.get('id'), timeStamp])
+                                                eval_states_dict = self.get_dict_records(violations.get('Evaluation States'), "evaluationStates")
+                                                violations_list = [
+                                                    violations.get('Start Time'), violations.get('Affected Object'),
+                                                    violations.get('Description'), violations.get('Severity'),
+                                                    tier.get('id'), app.get('id'), timeStamp,
+                                                    violations.get('End Time'), violations.get('Status'), eval_states_dict
+                                                ]
+                                                self.databaseObject.insertOrUpdate('HealthViolations', violations.get('Violation Id'), violations_list)
                                                 violationList.append(violations.get('Violation Id'))
                                         except Exception as e:
                                             current_app.logger.info('Exception in HEV, Error:'+str(e))
