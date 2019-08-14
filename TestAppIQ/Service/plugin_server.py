@@ -1011,7 +1011,7 @@ def get_details(tenant, appId):
         for each in merged_data:
             epg_health = aci_local_object.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
             details_list.append({
-                'IP': each['IP']
+                'IP': each['IP'],
                 'epgName': each['EPG'],
                 'epgHealth': epg_health,
                 'endPointName': each['VM-Name'],
