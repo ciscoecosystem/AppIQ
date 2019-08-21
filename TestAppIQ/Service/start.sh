@@ -7,10 +7,10 @@ date >> /home/app/log/app.log
 # pip install gunicorn >> /home/app/log/app.log
 cd /home/app/src/Service
 pip install gunicorn-19.9.0-py2.py3-none-any.whl
-gunicorn -b "0.0.0.0:80" -t 300 -w 8 app:app >> /home/app/log/app.log 2>> /home/app/log/app.log
+gunicorn -b "0.0.0.0:80" -t 300 -w 4 app:app >> /home/app/log/app.log 2>> /home/app/log/app.log
 
 
 echo "=================================" >> /home/app/log/app.log
 
 # python /home/app/src/Service/app.py >> /home/app/log/app.log 2>> /home/app/log/app.log
-python /home/app/src/Service/main_thread.py >> /home/app/log/main_thread.log 2>> /home/app/log/main_thread.log
+# python /home/app/src/Service/main_thread.py >> /home/app/log/main_thread.log 2>> /home/app/log/main_thread.log
