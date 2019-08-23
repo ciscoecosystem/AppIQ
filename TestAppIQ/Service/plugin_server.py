@@ -528,7 +528,10 @@ def getEpInfo(ep_children_list, aci_local_object):
         elif child_name == "fvRsCEpToPathEp":
             name = ep_child["fvRsCEpToPathEp"]["attributes"]["tDn"]
             pod_number = name.split("/pod-")[1].split("/")[0]
-            node_number = name.split("/paths-")[1].split("/")[0]
+            if (name.find("/protpaths") != -1):
+                node_number = name.split("/protpaths-")[1].split("/")[0]
+            else:
+                node_number = name.split("/paths-")[1].split("/")[0]
             eth_name = name.split("/pathep-[")[1][0:-1]
 
             iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
@@ -582,7 +585,10 @@ def getConfiguredAccessPolicies(tn, ap, epg):
             cap_dict["aep"] = cap_attr["attEntityP"].split("/attentp-")[1]
             cap_dict["iface_prof"] = cap_attr["accPortP"].split("/accportprof-")[1]
             cap_dict["pc_vpc"] = cap_attr["accBndlGrp"].split("/accportgrp-")[1]
-            cap_dict["node"] = cap_attr["pathEp"].split("/paths-")[1].split("/pathep-")[0]
+            if (cap_attr["pathEp"].find("/protpaths") != -1):
+                cap_dict["node"] = cap_attr["pathEp"].split("/protpaths-")[1].split("/pathep-")[0]
+            else:
+                cap_dict["node"] = cap_attr["pathEp"].split("/paths-")[1].split("/pathep-")[0]
             cap_dict["path_ep"] = cap_attr["pathEp"].split("/pathep-")[1][1:-1]
             cap_dict["vlan_pool"] = cap_attr["vLanPool"].split("/from-")[1]
 
@@ -1010,6 +1016,12 @@ def get_details(tenant, appId):
 
         for each in merged_data:
             epg_health = aci_local_object.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
+            
+            if (each['Interfaces'][0].find("/protpaths") != -1):
+                node = each['Interfaces'][0].split("/protpaths-")[1].split("/pathep-")[0]
+            else:
+                node = each['Interfaces'][0].split("/paths-")[1].split("/pathep-")[0]
+
             details_list.append({
                 'IP': each['IP'],
                 'epgName': each['EPG'],
@@ -1020,7 +1032,7 @@ def get_details(tenant, appId):
                 'dn': each['dn'],
                 'mac': each['CEP-Mac'],
                 'interface': each['Interfaces'][0].split("/pathep-")[1][1:-1],
-                'node': each['Interfaces'][0].split("/paths-")[1].split("/pathep-")[0]
+                'node': node
             })
 
         app.logger.info("-> UI Action details.json ended")
