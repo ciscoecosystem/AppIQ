@@ -9,12 +9,14 @@ from cobra.model.aaa import UserCert as AaaUserCert
 import logging, pprint
 from flask import current_app
 import datetime
+from custom_logger import CustomLogger
 
 try:
     from OpenSSL.crypto import FILETYPE_PEM, load_privatekey, sign
 except:
     print "=== could not import openssl crypto ==="
 
+logger = CustomLogger.get_logger("/home/app/log/app.log")
 
 def createCertSession():
     start_time = datetime.datetime.now()
@@ -29,7 +31,7 @@ def createCertSession():
         pKey = file.read()
 
     end_time =  datetime.datetime.now()
-    current_app.logger.info("-A Time for createCertSession: " + str(end_time - start_time))
+    logger.info("Time for createCertSession: " + str(end_time - start_time))
 
     return (aaaUserCert, pKey)
 
@@ -38,7 +40,7 @@ class ACI_Local(object):
     # g_session = requests.Session()
     def __init__(self, tenant):
         self.apic_ip = '172.17.0.1'
-        self.logger = logging.getLogger('Tenant:'+str(tenant))
+        # self.logger = logging.getLogger('Tenant:'+str(tenant))
         self.tenant = tenant
 
         # self.session = ACI_Local.g_session
@@ -47,7 +49,7 @@ class ACI_Local(object):
         self.proto = 'https://'
         self.apic_token = self.login()
         if not self.apic_token:
-            current_app.logger.info('Connection to APIC failed. Trying http instead...')
+            logger.warning('Connection to APIC failed. Trying http instead...')
             self.proto = 'http://'
             self.apic_token = self.login()
         if self.apic_token:
@@ -56,7 +58,7 @@ class ACI_Local(object):
             self.epg_url =  self.proto + self.apic_ip + '/api/class/fvAEPg.json'
             self.ep_url =  self.proto + self.apic_ip + '/api/class/fvCEp.json'
         else:
-            current_app.logger.info('Could not connect to APIC. Please verify your APIC connection.')
+            logger.error('Could not connect to APIC. Please verify your APIC connection.')
         # self.apic_token = self.apic_login()
         #self.apic_token = self.login()
 
@@ -91,17 +93,17 @@ class ACI_Local(object):
                 #print auth['imdata'][0]
                 auth_token = auth['imdata'][0]['aaaLogin']['attributes']['token']
                 #self.logger.info(auth_token)
-                #current_app.logger.info('Auth token generated for APIC')
+                #logger.info('Auth token generated for APIC')
                 return auth_token
             else:
                 return None
         except:
-            current_app.logger.info('Could not communicate with APIC')
+            logger.exception('Could not communicate with APIC')
             return None
         finally:
             # session.close()
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for ACI login: " + str(end_time - start_time))
+            logger.info("Time for ACI login: " + str(end_time - start_time))
 
 
     def ACI_get(self, url,cookie=None):
@@ -109,23 +111,23 @@ class ACI_Local(object):
         try:
             # :Changed requests to self.session
             response = self.session.get(url,cookies=cookie, verify=False)
-            #current_app.logger.info('API call for APIC: '+str(url))
+            #logger.info('API call for APIC: '+str(url))
             if response.status_code == 200 or response.status_code == 201:
-                # current_app.logger.info('API call sucess: '+str(url))
+                # logger.info('API call sucess: '+str(url))
                 return response
             else:
                 apic_token = self.login()
                 # :Changed requests to self.session
                 response = self.session.get(url,cookies={'APIC-Cookie': apic_token}, verify=False)
                 if response.status_code == 200 or response.status_code == 201:
-                    current_app.logger.info('API call success: '+str(url))
+                    logger.info('API call success: '+str(url))
                     return response
         except Exception as e:
-            current_app.logger.info('ACI call Exception:'+str(e)+', URL:'+str(url))
+            logger.exception('ACI call Exception:'+str(e)+', URL:'+str(url))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: Could not connect to APIC database. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for ACI_get: " + str(end_time - start_time))
+            logger.info("Time for ACI_get: " + str(end_time - start_time))
 
 
     def get_mo_related_item(self, mo_dn, item_query_string, item_type):
@@ -145,13 +147,13 @@ class ACI_Local(object):
             return mo_related_item_list
             # return {"status": True, "payload": mo_related_item_list}
         except Exception as ex:
-            current_app.logger.info('Exception while fetching EPG item with query string: ' + item_query_string + ',\nError:' + str(ex))
-            current_app.logger.info('Epg Item Url : =>' + mo_related_item_url)
+            logger.exception('Exception while fetching EPG item with query string: ' + item_query_string + ',\nError:' + str(ex))
+            logger.exception('Epg Item Url : =>' + mo_related_item_url)
             return []
             # return {"status": False, "payload": []}
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for get_mo_related_item: " + str(end_time - start_time))
+            logger.info("Time for get_mo_related_item: " + str(end_time - start_time))
 
 
     def get_all_mo_instances(self, mo_class, query_string = ""):
@@ -164,11 +166,11 @@ class ACI_Local(object):
             mo_instance_list = ((json.loads(mo_resp.text)['imdata']))
             return {"status": True, "payload": mo_instance_list}
         except Exception as ex:
-            current_app.logger.info('Exception while fetching MO: ' + mo_class + ', Error:' + str(ex))
+            logger.exception('Exception while fetching MO: ' + mo_class + ', Error:' + str(ex))
             return {"status": False, "payload": []}
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for get_all_mo_instances: " + str(end_time - start_time))
+            logger.info("Time for get_all_mo_instances: " + str(end_time - start_time))
 
 
     def get_epg_health(self,tenant,app_profile,epg_name,apic_token=None):
@@ -183,11 +185,11 @@ class ACI_Local(object):
                     if str(key) == 'healthInst':
                         return value['attributes']['cur']
         except Exception as e:
-            current_app.logger.info('Exception in EPG health API call, Error:'+str(e))
+            logger.exception('Exception in EPG health API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve EPG Health. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for get_epg_health: " + str(end_time - start_time))
+            logger.info("Time for get_epg_health: " + str(end_time - start_time))
 
 
     def apic_fetchEPData(self, tenant,apic_token=None):
@@ -198,16 +200,16 @@ class ACI_Local(object):
             # ep_response = requests.get(url, cookies={'APIC-Cookie': apic_token}, verify=False)
             ep_response = self.ACI_get(url,cookie={'APIC-Cookie': apic_token})
             if json.loads(ep_response.text)['imdata']:
-                current_app.logger.info('Total EPs fetched for Tenant: '+str(tenant)+' - '+str(len(json.loads(ep_response.text)['imdata']))+ 'EPs')
+                logger.info('Total EPs fetched for Tenant: '+str(tenant)+' - '+str(len(json.loads(ep_response.text)['imdata']))+ 'EPs')
                 return json.loads(ep_response.text)['imdata']
             else:
                 return []
         except Exception as e:
-            current_app.logger.info('Exception in EP/IP Data API call, Error:'+str(e))
+            logger.exception('Exception in EP/IP Data API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve EP data. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for apic_fetchEPData: " + str(end_time - start_time))
+            logger.info("Time for apic_fetchEPData: " + str(end_time - start_time))
 
 
     def apic_fetchEPGData(self, tenant,apic_token=None):
@@ -218,16 +220,16 @@ class ACI_Local(object):
             #epg_response = requests.get(url, cookies={'APIC-Cookie': apic_token}, verify=False)
             epg_response = self.ACI_get(url,cookie={'APIC-Cookie': apic_token})
             if json.loads(epg_response.text)['imdata']:
-                current_app.logger.info('Total EPGs fetched for Tenant: '+str(tenant)+' - '+str(len(json.loads(epg_response.text)['imdata']))+ 'EPGs')
+                logger.info('Total EPGs fetched for Tenant: '+str(tenant)+' - '+str(len(json.loads(epg_response.text)['imdata']))+ 'EPGs')
                 return json.loads(epg_response.text)['imdata']
             else:
                 return []
         except Exception as e:
-            current_app.logger.info('Exception in EPG Data API call, Error:'+str(e))
+            logger.exception('Exception in EPG Data API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve EPG data. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for apic_fetchEPGData: " + str(end_time - start_time))
+            logger.info("Time for apic_fetchEPGData: " + str(end_time - start_time))
 
 
     def apic_fetchBD(self, dn,apic_token=None):
@@ -239,16 +241,16 @@ class ACI_Local(object):
             bd_response = self.ACI_get(url,cookie={'APIC-Cookie': apic_token})
             if json.loads(bd_response.text)['imdata']:
                 bd_data = (json.loads(bd_response.text)['imdata'])[0]['fvRsBd']['attributes']['tnFvBDName']
-                #current_app.logger.info('BDs fetched!')
+                #logger.info('BDs fetched!')
                 return bd_data
             else:
                 return ""
         except Exception as e:
-            current_app.logger.info('Exception in BD API call, Error:'+str(e))
+            logger.exception('Exception in BD API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could retrieve BD data. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for apic_fetchBD: " + str(end_time - start_time))
+            logger.info("Time for apic_fetchBD: " + str(end_time - start_time))
 
 
     def apic_fetchVRF(self,dn,apic_token=None):
@@ -261,16 +263,16 @@ class ACI_Local(object):
             vrf_response = self.ACI_get(url,cookie={'APIC-Cookie': apic_token})
             if json.loads(vrf_response.text)['imdata']:
                 vrf_data = (json.loads(vrf_response.text)['imdata'])[0]['fvRsCtx']['attributes']['tnFvCtxName']
-                #current_app.logger.info('VRFs fetched!')
+                #logger.info('VRFs fetched!')
                 return vrf_data
             else:
                 return ""
         except Exception as e:
-            current_app.logger.info('Exception in VRF API call, Error:'+str(e))
+            logger.exception('Exception in VRF API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve VRF data. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for apic_fetchVRF: " + str(end_time - start_time))
+            logger.info("Time for apic_fetchVRF: " + str(end_time - start_time))
 
 
     def extractCtxName(self, dn):
@@ -286,7 +288,7 @@ class ACI_Local(object):
             bd_response = self.ACI_get(url,cookie={'APIC-Cookie': apic_token})
             contract_list = []
             if json.loads(bd_response.text)['imdata']:
-                #current_app.logger.info('Contracts fetched!')
+                #logger.info('Contracts fetched!')
                 ctx = json.loads(bd_response.text)['imdata']
             else:
                 ctx = {}
@@ -312,11 +314,11 @@ class ACI_Local(object):
                     contract_list.append({'Taboo': ct_name})
             return contract_list
         except Exception as e:
-            current_app.logger.info('Exception in Contracts API call, Error:'+str(e))
+            logger.exception('Exception in Contracts API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve Contracts. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for apic_fetchContract: " + str(end_time - start_time))
+            logger.info("Time for apic_fetchContract: " + str(end_time - start_time))
 
 
     # Reads dn, ip and tenant for an fvIp and returns a list of those dictionaries
@@ -332,13 +334,11 @@ class ACI_Local(object):
     def apic_parseData(self, ep_resp,apic_token=None):
         start_time = datetime.datetime.now()
         try:
-            current_app.logger.info('Parsing APIC Data!')
+            logger.info('Parsing APIC Data!')
             ep_list = []
-            
-            current_app.logger.info("")
 
             for ep in ep_resp:
-                #current_app.logger.info('EP Name:'+str(ep['fvCEp']['attributes']['name']))
+                #logger.info('EP Name:'+str(ep['fvCEp']['attributes']['name']))
                 ep_attr = ep['fvCEp']['attributes']
                 fviplist = []
                 for eachip in ep['fvCEp']['children']:
@@ -401,36 +401,36 @@ class ACI_Local(object):
                             ep_dict.update({'VMM-Domain':'None'})
                             ep_dict.update({'VM-Name':'EP-'+str(ep['fvCEp']['attributes']['name'])})
                         ep_dict.update({'Interfaces': path_list})
-                    #current_app.logger.info('EP Dict:')
-                    #current_app.logger.info(ep_dict)
+                    #logger.info('EP Dict:')
+                    #logger.info(ep_dict)
                     ep_list.append(ep_dict)
             return ep_list
         except Exception as e:
-            current_app.logger.info('Exeption in ACI Parsing Data, Error: '+str(e))
+            logger.exception('Exeption in ACI Parsing Data, Error: '+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not parse APIC data. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for apic_parseData: " + str(end_time - start_time))
+            logger.info("Time for apic_parseData: " + str(end_time - start_time))
 
 
     def main(self):
         start_time = datetime.datetime.now()
         try:
             auth_token = self.login()
-            current_app.logger.info('APIC Login success!')
+            logger.info('APIC Login success!')
             # ep_data = self.apic_fetchEPData(auth_token,self.tenant)
             # ep_data = self.apic_fetchEPData(self.tenant,apic_token=auth_token)
             epg_data = self.apic_fetchEPGData(self.tenant,apic_token=auth_token)
-            #current_app.logger.info('EPG data in main:'+str(epg_data))
+            #logger.info('EPG data in main:'+str(epg_data))
             parse_data = self.apic_parseData(epg_data,apic_token=auth_token)
-            #current_app.logger.info('Parse data in main'+str(parse_data))
+            #logger.info('Parse data in main'+str(parse_data))
             return parse_data
         except Exception as e:
-            current_app.logger.info('Exception in ACI Local Main, Error:'+str(e))
+            logger.exception('Exception in ACI Local Main, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve ACI objects. Error: "+str(e)})
         finally:
             end_time =  datetime.datetime.now()
-            current_app.logger.info("-A Time for ACI MAIN: " + str(end_time - start_time))
+            logger.info("Time for ACI MAIN: " + str(end_time - start_time))
 
 
 # ==============================================================================================================================

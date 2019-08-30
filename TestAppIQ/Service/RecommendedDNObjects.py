@@ -7,7 +7,9 @@ import ACI_Local as aci_local
 db_object = database.Database()
 from flask import current_app
 # aci_object = ACI_EPs.ACI('192.168.130.10', 'admin', 'Cisco!123')  # Change it later to ACI_Local
+from custom_logger import CustomLogger
 
+logger = CustomLogger.get_logger("/home/app/log/app.log")
 
 class Recommend(object):
 
@@ -143,9 +145,9 @@ class Recommend(object):
 
 
     def correlate_ACI_AppD(self, tenant, appId):
-        current_app.logger.info('Finding Correlations for ACI and AppD')
+        logger.info('Finding Correlations for ACI and AppD')
         appd_ips = list(set(db_object.ipsforapp(appId)))
-        current_app.logger.info('AppD IPs: '+str(appd_ips))
+        logger.info('AppD IPs: '+str(appd_ips))
         ip_list = []
         if not appd_ips:
             return []
@@ -157,11 +159,11 @@ class Recommend(object):
         end_points = aci_local_object.apic_fetchEPData(tenant)
         if not end_points:
             return []
-        #current_app.logger.info('ACI EPs found:'+str(end_points))
+        #logger.info('ACI EPs found:'+str(end_points))
         try:
             parsed_eps = aci_local_object.parseEPsforTemp(end_points,tenant)
         except Exception as e:
-            current_app.logger.info('Exception in parsed eps list, Error:'+str(e))
+            logger.exception('Exception in parsed eps list, Error:'+str(e))
             return []
         # end_points = aci_object.apic_fetchEPData(tenant)
         # parsed_eps = aci_object.parseEPsforTemp(end_points, tenant)
@@ -176,9 +178,9 @@ class Recommend(object):
             each['dn'] = splitdn
         try:
             common_eps = self.getCommonEPs(ip_list, parsed_eps)
-            current_app.logger.info('Common EPs:'+str(common_eps))
+            logger.info('Common EPs:'+str(common_eps))
         except Exception as e:
-            current_app.logger.info('Exception in common eps list, Error:'+str(e))
+            logger.exception('Exception in common eps list, Error:'+str(e))
             return []
 
         if common_eps:
@@ -188,10 +190,10 @@ class Recommend(object):
         try:
             rec_list = self.determine_recommendation(extract_ap_epgs,common_eps)
         except Exception as e:
-            current_app.logger.info('Exception in rec list, Error:'+str(e))
+            logger.exception('Exception in rec list, Error:'+str(e))
             return []
         if rec_list:
-            current_app.logger.info('Recommendation list for app:'+str(appId)+'  rec_list= '+str(rec_list))
+            logger.info('Recommendation list for app:'+str(appId)+'  rec_list= '+str(rec_list))
             fin_list = set(map(tuple,rec_list))
             final_list = map(list,fin_list)
         else:
@@ -199,10 +201,10 @@ class Recommend(object):
         try:
             generated_list = self.generatelist(final_list)
         except Exception as e:
-            current_app.logger.info('Exception in generate list, Error:'+str(e))
+            logger.exception('Exception in generate list, Error:'+str(e))
             return []
         if generated_list:
-            current_app.logger.info('Generated List = '+str(generated_list))
+            logger.info('Generated List = '+str(generated_list))
             return generated_list
         else:
             return []

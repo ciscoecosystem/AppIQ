@@ -13,10 +13,11 @@ from sqlalchemy import exists
 import sqlalchemy.types as types
 import datetime
 import time, json
+from custom_logger import CustomLogger
 
 # app.debug = True
 Base = declarative_base()
-
+logger = CustomLogger.get_logger("/home/app/log/app.log")
 
 class Application(Base):
     __tablename__ = 'Application'
@@ -247,7 +248,7 @@ class Database():
         try:
             self.conn.execute("PRAGMA journal_mode = WAL")
         except Exception as ex:
-            current_app.logger.info("Exception setting journal mode to WAL : " + str(ex))
+            logger.exception("Exception setting journal mode to WAL : " + str(ex))
 
         self.session = Session(bind=self.conn)
 
@@ -258,39 +259,39 @@ class Database():
             self.metadata.create_all(self.engine)
             return None
         except Exception as e:
-            current_app.logger.info('Exception in creating tables: ' + str(e))
+            logger.exception('Exception in creating tables: ' + str(e))
             # Log: internal backend error: could not create tables
             return None
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for createTable: " + str(end_time - start_time))
+            #logger.info("Time for createTable: " + str(end_time - start_time))
 
 
     def flushSession(self):
         #start_time = datetime.datetime.now()
         try:
-            current_app.logger.info('Session Flushed!')
+            logger.info('Session Flushed!')
             self.session.flush()
         except Exception as e:
-            current_app.logger.info('Could not flush the session!')
+            logger.exception('Could not flush the session! Error:' + str(e))
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for flishSession: " + str(end_time - start_time))
+            #logger.info("Time for flishSession: " + str(end_time - start_time))
 
 
     def commitSession(self):
         #start_time = datetime.datetime.now()
         try:
             self.session.commit()
-        # current_app.logger.info('Session Commited!')
+        # logger.info('Session Commited!')
         # Log: internal backend error: could not create tables
         # return "Session Committed"
         except Exception as e:
-            current_app.logger.info('Exception in Committing session: ' + str(e))
+            logger.exception('Exception in Committing session: ' + str(e))
             self.flushSession()
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for commitSession: " + str(end_time - start_time))
+            #logger.info("Time for commitSession: " + str(end_time - start_time))
 
 
     def insertInto(self, table, data):
@@ -330,14 +331,14 @@ class Database():
                 # IP, dn, appId
                 self.session.add(ACIperm(data[0], data[1], data[2], data[3]))
                 # self.commitSession()
-                # current_app.logger.info('Values populated into Table '+str(table))
+                # logger.info('Values populated into Table '+str(table))
         except Exception as e:
-            current_app.logger.info('Exception in Insert: ' + str(e))
+            logger.exception('Exception in Insert: ' + str(e))
             self.commitSession()
             # return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not insert into database. Error: "+str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for insertInto: " + str(end_time - start_time))
+            #logger.info("Time for insertInto: " + str(end_time - start_time))
 
 
     def update(self, table, data):
@@ -384,13 +385,13 @@ class Database():
                     {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3]})
 
                 # self.commitSession()
-                # current_app.logger.info('Table Updated '+str(table))
+                # logger.info('Table Updated '+str(table))
         except Exception as e:
-            current_app.logger.info('Exception in Update:' + str(e))
+            logger.exception('Exception in Update:' + str(e))
             self.commitSession()
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for update: " + str(end_time - start_time))
+            #logger.info("Time for update: " + str(end_time - start_time))
 
 
     def returnValues(self, table):
@@ -417,18 +418,18 @@ class Database():
             else:
                 return []
         except Exception as e:
-            current_app.logger.info('Exception in returning values for table: ' + str(table) + ', Error:' + str(e))
+            logger.exception('Exception in returning values for table: ' + str(table) + ', Error:' + str(e))
             self.commitSession()
             return []
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnValues: " + str(end_time - start_time))
+            #logger.info("Time for returnValues: " + str(end_time - start_time))
 
 
     def deleteEntry(self, table, deleteid):
         #start_time = datetime.datetime.now()
         try:
-            current_app.logger.info('To delete from table: ' + str(table) + '; id -' + str(deleteid))
+            logger.info('To delete from table: ' + str(table) + '; id -' + str(deleteid))
             if table == 'Application':
                 self.session.query(Application).filter(Application.appId == int(deleteid)).delete()
 
@@ -452,13 +453,13 @@ class Database():
                 #     self.session.query(ACIperm).filter(appId=int(id)).delete()
                 # if table == 'Mapping':
                 #    self.session.query(Mapping).filter(Mapping.appId == int(deleteid)).delete()
-                # current_app.logger.info('Table Values deleted for - '+str(table))
+                # logger.info('Table Values deleted for - '+str(table))
         except Exception as e:
-            current_app.logger.info('Exception Deleting values in table - ' + str(e))
+            logger.exception('Exception Deleting values in table - ' + str(e))
             self.commitSession()
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for deleteEntry: " + str(end_time - start_time))
+            #logger.info("Time for deleteEntry: " + str(end_time - start_time))
 
 
     def checkAndDelete(self, table, idList):
@@ -466,9 +467,9 @@ class Database():
         try:
             tabledata = self.returnValues(table)
         except Exception as e:
-            current_app.logger.info('Exception Deleting values in table - ' + str(e))  # return "Nothing to delete"
+            logger.exception('Exception Deleting values in table - ' + str(e))  # return "Nothing to delete"
         if not tabledata:
-            current_app.logger.info('Nothing to Delete')
+            logger.info('Nothing to Delete')
         if tabledata:
             tableids = []
             if table == 'Application':
@@ -482,15 +483,15 @@ class Database():
             if table == 'HealthViolations':
                 for each in tabledata: tableids.append(each.violationId)
             deleteList = list(set(tableids) - set(idList))
-            current_app.logger.info('Delete for table:'+str(table)+', idlist: '+str(idList))
+            logger.info('Delete for table:'+str(table)+', idlist: '+str(idList))
             try:
                 for each in deleteList: self.deleteEntry(table, each)
             except Exception as e:
-                current_app.logger.info('Exception in Check and Delete: ' + str(e))
+                logger.exception('Exception in Check and Delete: ' + str(e))
                 self.commitSession()
             #finally:
                 #end_time = datetime.datetime.now()
-                #current_app.logger.info("-D Time for checkAndDelete: " + str(end_time - start_time))
+                #logger.info("Time for checkAndDelete: " + str(end_time - start_time))
 
 
     def insertOrUpdate(self, table, key, data):
@@ -606,11 +607,11 @@ class Database():
 
             self.commitSession()
         except Exception as ex:
-            current_app.logger.info('Exception while ' + action + ' Record in: \n Table : ' + table + "\n " + str(ex))
+            logger.exception('Exception while ' + action + ' Record in: \n Table : ' + table + "\n " + str(ex))
             self.commitSession()
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for insertOrUpdate: " + str(end_time - start_time))
+            #logger.info("Time for insertOrUpdate: " + str(end_time - start_time))
 
 
     # Gets Data From Table and Updates or Inserts a record with given ID
@@ -640,23 +641,23 @@ class Database():
                     for each in tabledata: tableids.append(each.dn)
             if tableids:
                 if dataId in tableids:
-                    current_app.logger.info('Update table:' + str(table) + ' with Values:' + str(data))
+                    logger.info('Update table:' + str(table) + ' with Values:' + str(data))
                     self.update(table, data)
                 else:
-                    current_app.logger.info('Insert into table:' + str(table) + ' with Values:' + str(data))
+                    logger.info('Insert into table:' + str(table) + ' with Values:' + str(data))
                     self.insertInto(table, data)
                     # update
             else:
-                current_app.logger.info('Insert into table:' + str(table) + ' with Values:' + str(data))
+                logger.info('Insert into table:' + str(table) + ' with Values:' + str(data))
                 self.insertInto(table, data)
-            # current_app.logger.info('Insert/Update executed for Table:'+str(table))
+            # logger.info('Insert/Update executed for Table:'+str(table))
             self.commitSession()
         except Exception as e:
-            current_app.logger.info('Exception in Insert: ' + str(e))
+            logger.exception('Exception in Insert: ' + str(e))
             self.commitSession()
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for checkIfExistsandUpdate: " + str(end_time - start_time))
+            #logger.info("Time for checkIfExistsandUpdate: " + str(end_time - start_time))
 
 
     # Returns values from database based on query filers (IDs)
@@ -671,12 +672,13 @@ class Database():
                 return self.session.query(Application).filter(Application.appName == query_params)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return Application details. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Application details. Error: " + str(
                                    e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnApplication: " + str(end_time - start_time))
+            #logger.info("Time for returnApplication: " + str(end_time - start_time))
 
 
     def returnFaults(self, dn):
@@ -697,6 +699,7 @@ class Database():
                 "message" : ""
             }              
         except Exception as ex:
+            logger.exception("Internal backend error: could not return Fault details. Error: " + str(ex))
             return {
                 "payload": [],
                 "status": False,
@@ -704,7 +707,7 @@ class Database():
             }
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnFaults: " + str(end_time - start_time))
+            #logger.info("Time for returnFaults: " + str(end_time - start_time))
 
 
     def returnEvents(self, dn):
@@ -725,6 +728,7 @@ class Database():
                 "message" : ""
             }
         except Exception as ex:
+            logger.exception("Internal backend error: could not return Event details. Error: " + str(ex))
             return {
                 "payload": [],
                 "status": False,
@@ -732,7 +736,7 @@ class Database():
             }
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnEvents: " + str(end_time - start_time))
+            #logger.info("Time for returnEvents: " + str(end_time - start_time))
 
 
     def returnAuditLogs(self, dn):
@@ -753,6 +757,7 @@ class Database():
                 "message" : ""
             }
         except Exception as ex:
+            logger.exception("Internal backend error: could not return Audit Log details. Error: " + str(ex))
             return {
                 "payload": [],
                 "status": False,
@@ -760,7 +765,7 @@ class Database():
             }
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnAuditLogs: " + str(end_time - start_time))
+            #logger.info("Time for returnAuditLogs: " + str(end_time - start_time))
 
 
     def returnTiers(self, query_type, query_params):
@@ -775,11 +780,12 @@ class Database():
                 return self.session.query(Tiers).filter(Tiers.appId == query_params)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return Tier details. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Tier details. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnTiers: " + str(end_time - start_time))
+            #logger.info("Time for returnTiers: " + str(end_time - start_time))
 
 
     def returnNodes(self, query_type, query_params):
@@ -798,11 +804,12 @@ class Database():
                 return self.session.query(Nodes).filter(func.json_contains(Nodes.ipAddress, query_params) == 1).all()
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return Node details. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Node details. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnNodes: " + str(end_time - start_time))
+            #logger.info("Time for returnNodes: " + str(end_time - start_time))
 
 
     def returnServiceEndpoints(self, query_type, query_params):
@@ -817,12 +824,13 @@ class Database():
                 return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == query_params)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return service endpoints. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return service endpoints. Error: " + str(
                                    e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnServiceEndpoints: " + str(end_time - start_time))
+            #logger.info("Time for returnServiceEndpoints: " + str(end_time - start_time))
 
 
     def returnHealthViolations(self, query_type, query_params):
@@ -843,12 +851,13 @@ class Database():
                 return self.session.query(HealthViolations).filter(HealthViolations.businessTransaction == query_params)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return Health violations. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Health violations. Error: " + str(
                                    e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnHealthViolations: " + str(end_time - start_time))
+            #logger.info("Time for returnHealthViolations: " + str(end_time - start_time))
 
 
     # Returns values from database based on query filers for ACI objects
@@ -865,11 +874,12 @@ class Database():
                 return self.session.query(ACIperm).filter(ACIperm.appId == query_params)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return ACI objects. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return ACI objects. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnACItemp: " + str(end_time - start_time))
+            #logger.info("Time for returnACItemp: " + str(end_time - start_time))
 
 
     def returnACIperm(self, query_type, query_params):
@@ -883,11 +893,12 @@ class Database():
                 return self.session.query(ACIperm).filter(ACIperm.appId == query_params)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not return ACI objects. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return ACI objects. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnACIperm: " + str(end_time - start_time))
+            #logger.info("Time for returnACIperm: " + str(end_time - start_time))
 
     def storechangesinACItemp(self, data):
         #start_time = datetime.datetime.now()
@@ -898,12 +909,13 @@ class Database():
             return "Stored"
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not store data into databse. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not store data into databse. Error: " + str(
                                    e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for storechangesinACItemp: " + str(end_time - start_time))
+            #logger.info("Time for storechangesinACItemp: " + str(end_time - start_time))
 
 
     def getappList(self):
@@ -920,12 +932,13 @@ class Database():
             return applicationList
         except Exception as e:
             self.flushSession()
+            logger.exception( "Internal backend error: could not retrieve Application list. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not retrieve Application list. Error: " + str(
                                    e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for getappList: " + str(end_time - start_time))
+            #logger.info("Time for getappList: " + str(end_time - start_time))
 
 
     def enableViewUpdate(self, appId, bool):
@@ -936,10 +949,11 @@ class Database():
             return self.commitSession()
         except Exception as e:
             self.flushSession()
-            # return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view for application"+str(appId)+". Error: "+str(e)})
+            logger.exception("Could not enable the view for application"+str(appId)+". Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view for application"+str(appId)+". Error: "+str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for enableViewUpdate: " + str(end_time - start_time))
+            #logger.info("Time for enableViewUpdate: " + str(end_time - start_time))
 
 
     def saveMappings(self, appId, mapped_data):
@@ -949,11 +963,12 @@ class Database():
             return "Mapping Saved."
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not save mappings. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not save mappings. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for saveMappings: " + str(end_time - start_time))
+            #logger.info("Time for saveMappings: " + str(end_time - start_time))
 
 
     def returnMapping(self, query_params):
@@ -964,11 +979,12 @@ class Database():
                 return first.mapped_data
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not retrieve mappings. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not retrieve mappings. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for returnMapping: " + str(end_time - start_time))
+            #logger.info("Time for returnMapping: " + str(end_time - start_time))
 
 
     def ipsforapp(self, appId):
@@ -977,11 +993,12 @@ class Database():
             return self.returnNodes('appId', appId)
         except Exception as e:
             self.flushSession()
+            logger.exception("Internal backend error: could not retrieve nodes. Error: " + str(e))
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not retrieve nodes. Error: " + str(e)})
         #finally:
             #end_time = datetime.datetime.now()
-            #current_app.logger.info("-D Time for ipsforapp: " + str(end_time - start_time))
+            #logger.info("Time for ipsforapp: " + str(end_time - start_time))
 
 
 # ======= MAIN ========

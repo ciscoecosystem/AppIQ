@@ -13,9 +13,13 @@ import AppD_Alchemy as Database
 import generate_d3 as d3
 import RecommendedDNObjects as Recommend
 from multiprocessing import Process, Value
+from custom_logger import CustomLogger
+
 app = Flask(__name__, template_folder="../UIAssets", static_folder="../UIAssets/public")
 app.debug = True
-app.logger.info('::::::::::::::::::::::::::::::::In plugin_server::::::::::::::::::::::::')
+
+logger = CustomLogger.get_logger("/home/app/log/app.log")
+
 # appd_object = AppDConnect.AppD('10.23.239.14', 'user1', 'customer1', 'welcome')
 # appd_object = AppDConnect.AppD('192.168.132.125', 'user1', 'customer1', 'Cisco!123')
 
@@ -25,7 +29,6 @@ app.logger.info('::::::::::::::::::::::::::::::::In plugin_server:::::::::::::::
 database_object = Database.Database()
 d3Object = d3.generateD3Dict()
 
-# sleep_main = Value('i', 0)
 
 def  getInstanceName():
     instance_path = '/home/app/data/credentials.json' # On APIC
@@ -47,14 +50,14 @@ def  getInstanceName():
 @app.route('/check.json', methods=['GET', 'POST'])
 def checkFile():
     start_time = datetime.datetime.now()
-    app.logger.info('Checking if File Exists')
+    logger.info('Checking if File Exists')
     path = '/home/app/data/credentials.json'
     # path = "/Users/nilayshah/Desktop/AppD_cisco23lab/Cisco_AppIQ/Service/credentials.json"
     file_exists = os.path.isfile(path)
     # print file_exists
     if not file_exists:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for checkFile File NOT found: " + str(end_time - start_time))
+        logger.error("Time for checkFile File NOT found: " + str(end_time - start_time))
         
         return json.dumps({"payload": "File does not exists", "status_code": "300",
                            "message": "AppDynamics is not configured. Please login!"})
@@ -72,7 +75,7 @@ def checkFile():
             # print appd_ip
             appd_object = AppDConnect.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
             status = appd_object.check_connection()
-            # print status - Change it to app.logger
+            # print status - Change it to logger
             if status == 200 or status == 201:
                 return json.dumps({"payload": "Signed in", "status_code": "200", "message": "OK"})
             else:
@@ -84,12 +87,11 @@ def checkFile():
                                "message": str(e) + ". Please re-configure AppDynamics Controller!"})
         finally:
             end_time =  datetime.datetime.now()
-            app.logger.info("-> Time for checkFile: " + str(end_time - start_time))
+            logger.info("Time for checkFile: " + str(end_time - start_time))
     
 
 
 def parseHost(ip):
-    print "Printing Host"
     try:
         parsed_host = socket.gethostbyname(ip)
         if parsed_host:
@@ -101,7 +103,7 @@ def parseHost(ip):
 @app.route('/login.json', methods=['GET', 'POST'])
 def login(appd_creds):
     start_time = datetime.datetime.now()
-    app.logger.info('Entered Login')
+    logger.info('Entered Login')
     host = str(appd_creds["appd_ip"])
     appd_port = str(appd_creds["appd_port"])
     appd_user = str(appd_creds["appd_user"])
@@ -147,13 +149,13 @@ def login(appd_creds):
                 creds.truncate()
                 json.dump(credentials, creds)
                 creds.close()
-            app.logger.info('Login Successful!')
+            logger.info('Login Successful!')
             #threading.Thread(target=appd_object.main).start()#appd_object.main()
             # time.sleep(4)
             return json.dumps({"payload": "Connection Successful", "status_code": "200",
                                "message": "Credentials Saved!"})  # login_resp
         else:
-            app.logger.info("login failed:"+str(login_check))
+            logger.error("login failed:"+str(login_check))
             return json.dumps({"payload": "Login to AppDynamics Failed", "status_code": str(login_check),
                                 "message": "Login to AppDynamics failed, exited with code: " + str(
                                     login_check) + ". Please verify AppDynamics connection"})
@@ -163,7 +165,7 @@ def login(appd_creds):
                            "message": "An error occured while saving AppDynamics Credentials. Please try again! Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for LOGIN to APP: " + str(end_time - start_time))
+        logger.info("Time for LOGIN to APP: " + str(end_time - start_time))
 
 
 def setPollingInterval(interval):
@@ -188,11 +190,11 @@ def setPollingInterval(interval):
             return "300", "Could not find Configuration File"
     except Exception as err:
         err_msg = "Exception while setting polling Interval : " + str(err)
-        app.logger.error(err_msg)
+        logger.error(err_msg)
         return "300", err_msg
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for setPollingInterval: " + str(end_time - start_time))
+        logger.info("Time for setPollingInterval: " + str(end_time - start_time))
     
 
 def setSleepVar(sleep_var):
@@ -220,17 +222,18 @@ def setSleepVar(sleep_var):
             raise Exception
     except Exception as err:
         err_msg = "Exception while setting sleeping variable : " + str(err)
+        logger.error(err_msg)
         return False, err_msg
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for setSleepVar: " + str(end_time - start_time))
+        logger.info("Time for setSleepVar: " + str(end_time - start_time))
 
 
 #@app.route('/apps.json', methods=['GET'])  # This shall be called from /check.json, for Cisco Live this is the first/start Route
 def apps(tenant):
     start_time = datetime.datetime.now()
     try:
-        app.logger.info("-> UI Action app.json started")
+        logger.info("UI Action app.json started")
         
         appsList = database_object.getappList()
         app_dict = {}
@@ -243,15 +246,16 @@ def apps(tenant):
                 mapped_objects = mapping(tenant,each['appId'])
         app_dict['app'] = app_list
         
-        app.logger.info("-> UI Action app.json ended")
+        logger.info("UI Action app.json ended")
         #time.sleep(5)
         return json.dumps({"instanceName":getInstanceName(),"payload": app_dict, "status_code": "200", "message": "OK"})
         # return json.dumps(dict)
     except Exception as e:
+        logger.exception("Could not fetch applications from databse. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch applications from databse. Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for APPS: " + str(end_time - start_time))
+        logger.info("Time for APPS: " + str(end_time - start_time))
 
 
 @app.route('/mapping.json', methods=['GET'])
@@ -264,25 +268,25 @@ def mapping(tenant, appDId):
         
         # returns the mapping from Mapping Table
         already_mapped_data = database_object.returnMapping(appId)
-        #app.logger.info('Already Mapped Data:'+str(already_mapped_data))
+        #logger.info('Already Mapped Data:'+str(already_mapped_data))
         rec_object = Recommend.Recommend()
         mapped_objects = rec_object.correlate_ACI_AppD(tenant, appDId)
-        app.logger.info('Post correlation of ACI and AppD')
-        #app.logger.info(mapped_objects)
+        logger.info('Post correlation of ACI and AppD')
+        #logger.info(mapped_objects)
         if not mapped_objects:
-            app.logger.info('Empty Mapping dict for appDId:'+str(appDId))
+            logger.info('Empty Mapping dict for appDId:'+str(appDId))
             return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, "status_code": "200","message": "OK"})
         if already_mapped_data != None:
-            app.logger.info('Mapping to target cluster already exists')
+            logger.info('Mapping to target cluster already exists')
             mapping_dict['target_cluster'] = already_mapped_data
         else:
             app_list = database_object.getappList()
-            app.logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
+            logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
             
             # Why not get the App with given AppId from DB??
             for each in app_list:
                 if each.get('appId') == appDId and each.get('isViewEnabled') == True:
-                    app.logger.info("Mapping Empty!")
+                    logger.info("Mapping Empty!")
                     target = []
                     for each in mapped_objects:
                         # print each
@@ -291,11 +295,11 @@ def mapping(tenant, appDId):
                                 target.append({'domainName': entry['domainName'], 'ipaddress': each['ipaddress']})
                                 mapping_dict['target_cluster'] = target
                     data_list = []
-                    app.logger.info('Target mapping for app:'+str(appDId))
+                    logger.info('Target mapping for app:'+str(appDId))
                     for mapping in target:
                         data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domainName']})
                     database_object.checkIfExistsandUpdate('Mapping', [appId, data_list])
-                    #                    saveMapping(appId,target)
+                    # saveMapping(appId,target)
                     view_enabled = enableView(appId, True)
         if mapped_objects:
             for new in mapped_objects:
@@ -304,11 +308,11 @@ def mapping(tenant, appDId):
         return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, "status_code": "200",
                            "message": "OK"})  # {"source_cluster": mapped_objects, "target_cluster": {{dn:IP},{dn:IP}}}
     except Exception as e:
-        app.logger.info('Exception in Mapping, Error:'+str(e))
+        logger.exception('Exception in Mapping, Error:'+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch mappings from the database. Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for MAPPING: " + str(end_time - start_time))
+        logger.info("Time for MAPPING: " + str(end_time - start_time))
 
 
 @app.route('/saveMapping.json', methods=['POST'])
@@ -316,7 +320,7 @@ def saveMapping(appDId, tenant, mappedData):
     start_time = datetime.datetime.now()
     try:
         appId = str(appDId) + str(tenant)
-        app.logger.info('Saving Mappings for app:'+str(appId))
+        logger.info('Saving Mappings for app:'+str(appId))
         mappedData_dict = json.loads(
             (str(mappedData).strip("'<>() ").replace('\'', '\"')))  # new implementation for GraphQL
         data_list = []
@@ -332,10 +336,11 @@ def saveMapping(appDId, tenant, mappedData):
             enableView(appDId, True)
             return json.dumps({"payload": "Saved Mappings", "status_code": "200", "message": "OK"})
     except Exception as e:
+        logger.exception("Could not save mappings to the database. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not save mappings to the database. Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for saveMapping: " + str(end_time - start_time))
+        logger.info("Time for saveMapping: " + str(end_time - start_time))
 
 
 def getFaults(dn):
@@ -362,6 +367,7 @@ def getFaults(dn):
             "payload": faults_payload
         })
     else:
+        logger.error("Error in fetching Fault List from Databse!")
         return json.dumps({
             "status_code": "300",
             "message": faults_resp["message"],
@@ -393,6 +399,7 @@ def getEvents(dn):
             "payload": events_payload
         })
     else:
+        logger.error("Error in fetching Event List from Databse!")
         return json.dumps({
             "status_code": "300",
             "message": events_resp["message"],
@@ -424,6 +431,7 @@ def getAuditLogs(dn):
             "payload": audit_logs_payload
         })
     else:
+        logger.error("Error in fetching Audit Logs List from Databse!")
         return json.dumps({
             "status_code": "300",
             "message": audit_logs_resp["message"],
@@ -476,7 +484,7 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
             "payload": ep_info_list
         })
     except Exception as e:
-        app.logger.info("Exception while getting Ep Info : " + str(e))
+        logger.exception("Exception while getting Children Ep Info : " + str(e))
         return json.dumps({
             "status_code": "300",
             "message": str(e),
@@ -484,7 +492,7 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
         })
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for getChildrenEpInfo: " + str(end_time - start_time))
+        logger.info("Time for getChildrenEpInfo: " + str(end_time - start_time))
     
 
 def getEpInfo(ep_children_list, aci_local_object):
@@ -503,7 +511,7 @@ def getEpInfo(ep_children_list, aci_local_object):
             try:
                 ctrlr_name = re.compile("\/ctrlr-\[.*\]-").split(hyperDn)[1].split("/")[0]
             except Exception as e:
-                app.logger.info("")
+                logger.exception("Exception in EpInfo: " + str(e))
                 ctrlr_name = ""
 
             hyper_query_string = 'query-target-filter=eq(compHv.dn,"' + hyperDn + '")'
@@ -513,7 +521,7 @@ def getEpInfo(ep_children_list, aci_local_object):
                 if hyper_resp["payload"]:
                     hyper_name = hyper_resp["payload"][0]["compHv"]["attributes"]["name"]
                 else:
-                    app.logger.info("Could not get Hosting Server Name using Hypervisor info")
+                    logger.error("Could not get Hosting Server Name using Hypervisor info")
                     hyper_name = ""
             else:
                 hyper_name = ""
@@ -542,7 +550,7 @@ def getEpInfo(ep_children_list, aci_local_object):
                 if vm_resp["payload"]:
                     vm_name = vm_resp["payload"][0]["compVm"]["attributes"]["name"]
                 else:
-                    app.logger.info("Could not get Name of EP using VM info")
+                    logger.error("Could not get Name of EP using VM info")
                     vm_name = ""
             else:
                 vm_name = ""
@@ -602,7 +610,7 @@ def getConfiguredAccessPolicies(tn, ap, epg):
         })
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for getConfiguredAccessPolicies: " + str(end_time - start_time))
+        logger.info("Time for getConfiguredAccessPolicies: " + str(end_time - start_time))
 
 
 def getSubnets(dn):
@@ -638,7 +646,7 @@ def getSubnets(dn):
         })
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for one: " + str(end_time - start_time))
+        logger.info("Time for one: " + str(end_time - start_time))
 
 
 def getToEpgTraffic(epg_dn):
@@ -725,7 +733,7 @@ def getToEpgTraffic(epg_dn):
             })
 
         except Exception as ex:
-            app.logger.info("Exception while fetching To EPG Traffic List : \n" + str(ex))
+            logger.exception("Exception while fetching To EPG Traffic List : \n" + str(ex))
             
             return json.dumps({
                 "status_code": "300",
@@ -734,11 +742,11 @@ def getToEpgTraffic(epg_dn):
             })
         finally:
             end_time =  datetime.datetime.now()
-            app.logger.info("-> Time for getToEpgTraffic: " + str(end_time - start_time))
+            logger.info("Time for getToEpgTraffic: " + str(end_time - start_time))
     else:
-        app.logger.info("Could not get Traffic Data related to EPG")
+        logger.error("Could not get Traffic Data related to EPG")
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for getToEpgTraffic: " + str(end_time - start_time))
+        logger.info("Time for getToEpgTraffic: " + str(end_time - start_time))
         return json.dumps({
             "status_code": "300",
             "message": "Exception while fetching Traffic Data related to EPG",
@@ -759,11 +767,11 @@ def getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object
         ingr_pkts = cur_ag_stat_attr["ingrPktsCum"]
         egr_pkts = cur_ag_stat_attr["egrPktsCum"]
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for getIngressEgress: " + str(end_time - start_time))
+        logger.info("Time for getIngressEgress: " + str(end_time - start_time))
         return ingr_pkts, egr_pkts
     else:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for getIngressEgress: " + str(end_time - start_time))
+        logger.info("Time for getIngressEgress: " + str(end_time - start_time))
         return "0", "0"
 
 
@@ -809,7 +817,7 @@ def getFilterList(flt_dn, aci_local_object):
 
     
     end_time =  datetime.datetime.now()
-    app.logger.info("-> Time for getFilterList: " + str(end_time - start_time))
+    logger.info("Time for getFilterList: " + str(end_time - start_time))
     return flt_list
 
 
@@ -827,25 +835,25 @@ def tree(tenantName, appId):
     try:
         
         start_time = datetime.datetime.now()
-        app.logger.info('-> UI Action TREE started')
+        logger.info('UI Action TREE started')
         setSleepVar(True)
         aci_local_object = aci_local.ACI_Local(tenantName)
         merged_data = merge_aci_appd(tenantName, appId, aci_local_object)
-        #app.logger.info("Merged data"+str(merged_data))
+        #logger.info("Merged data"+str(merged_data))
         response = json.dumps(d3Object.generate_d3_compatible_dict(merged_data))
         return json.dumps({"instanceName":getInstanceName(),"payload": response, "status_code": "200", "message": "OK"})
     except Exception as e:
-        app.logger.exception("Error while run.json" + str(e))
+        logger.exception("Error while run.json" + str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
     finally:
         setSleepVar(False)
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for TREE: " + str(end_time - start_time))
+        logger.info("Time for TREE: " + str(end_time - start_time))
 
 
 def merge_aci_appd(tenant, appDId, aci_local_object):
     start_time = datetime.datetime.now()
-    app.logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
+    logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
     try:
         # To change to ACI LOCAL
         # aci_local_object = aci_local.ACI_Local(tenant)
@@ -867,7 +875,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
         total_epg_count = {}
         merged_epg_count = {}
         non_merged_ep_dict = {}
-        non_merged_eps = []
+        
         for aci in aci_data:
             if aci['EPG'] not in epg_list:
                 epg_list.append(aci['EPG'])
@@ -913,7 +921,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 #fractions[epg] = str(len(merged_epg_count.get(epg, [])))+"/"+str(total_epg_count.get(epg, []))
                 un_map_eps = int(total_epg_count.get(epg, [])) - len(merged_epg_count.get(epg, []))
                 fractions[epg] = int(un_map_eps)
-                app.logger.info('Total Unmapped Eps (Inactive):'+str(un_map_eps))
+                logger.info('Total Unmapped Eps (Inactive):'+str(un_map_eps))
         updated_merged_list = []
         if fractions:
             for key, value in fractions.iteritems():
@@ -928,14 +936,14 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 each['fraction'] = '0'
                 each['Non_IPs'] = {}
             final_list.append(each)
-        app.logger.info('Merge complete. Total objects correlated :'+str(len(final_list)))
+        logger.info('Merge complete. Total objects correlated :'+str(len(final_list)))
         return final_list#updated_merged_list#,total_epg_count # TBD for returning values
     except Exception as e:
-        app.logger.exception("Error while merge_aci_data : "+str(e))
+        logger.exception("Error while merge_aci_data : "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Merge ACI and AppDynamics objects. Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for merge_aci_appd: " + str(end_time - start_time))
+        logger.info("Time for merge_aci_appd: " + str(end_time - start_time))
 
 
 def getappD(appId, ep):
@@ -944,9 +952,9 @@ def getappD(appId, ep):
         app = database_object.returnApplication('appId', appId)
         tiers = database_object.returnTiers('appId', appId)
         hevs = database_object.returnHealthViolations('appId', appId)
-        aci_ips_list = []
+        
         appd_list = []
-        appd_each_dict = {}
+
         for application in app:
             hev = database_object.returnHealthViolations('appId', application.appId)
             for tier in tiers:
@@ -985,10 +993,11 @@ def getappD(appId, ep):
                                         'serviceEndpoints': sepList, 'tierViolations': hevList})
         return appd_list
     except Exception as e:
+        logger.exception("Could not load the View. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for getappD: " + str(end_time - start_time))
+        logger.info("Time for getappD: " + str(end_time - start_time))
 
 
 @app.route('/details.json')  # Will take tenantname and appId as arguments
@@ -996,7 +1005,7 @@ def get_details(tenant, appId):
     try:
         start_time = datetime.datetime.now()
         #time.sleep(1)
-        app.logger.info("-> UI Action details.json started")
+        logger.info("UI Action details.json started")
         
         setSleepVar(True)
 
@@ -1030,12 +1039,13 @@ def get_details(tenant, appId):
                 'node': node
             })
 
-        app.logger.info("-> UI Action details.json ended")
+        logger.info("UI Action details.json ended")
         details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
         return json.dumps({"instanceName":getInstanceName(),"payload": details, "status_code": "200", "message": "OK"})
     except Exception as e:
+        logger.exception("Could not load the Details. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Details. Error: "+str(e)})
     finally:
         setSleepVar(False)
         end_time =  datetime.datetime.now()
-        app.logger.info("-> Time for GET_DETAILS: " + str(end_time - start_time))
+        logger.info("Time for GET_DETAILS: " + str(end_time - start_time))
