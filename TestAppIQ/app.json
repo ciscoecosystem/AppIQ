@@ -19,7 +19,7 @@
     "metaversion":"1.1",
     "name":"TesAppIQ",
     "permissions":[
-		"admin",
+        "admin",
         "tenant-connectivity-mgmt",
         "tenant-connectivity-util",
         "tenant-connectivity-l2",
