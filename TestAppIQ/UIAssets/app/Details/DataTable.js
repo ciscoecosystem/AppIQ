@@ -1,27 +1,47 @@
 import React, { Component } from "react"
 import { Table, Button } from "blueprint-react"
 import ToolBar from "./ToolBar"
+import tablestyle from "./tablestyle.css"
 export default class DataTable extends Component {
   constructor(props) {
     super(props);
     const HEADER_DETAILS = [
       {
-        Header: 'EPG',
+        Header: 'Fabric',
+        headerClassName : "center-class",
+        columns: [
+          {
+            Header: "Node",
+            accessor: "node"
+          },
+          {
+            Header: "Interface",
+            accessor: "interface"
+          }
+        ]
+      },
+      {
+        Header: 'APIC',
+        headerClassName : "center-class",
         columns: [
           {
             Header: "IP",
             accessor: "IP"
           },
           {
+            Header: "Mac",
+            accessor: "mac"
+          },
+          {
             Header: "End Point",
             accessor: "endPointName"
           },
           {
-            Header: "Name",
+            Header: "EPG",
             accessor: "epgName"
           },
           {
-            Header: "DN",
+            Header: "EPG-DN",
             accessor: 'dn'
           },
           {
@@ -41,11 +61,14 @@ export default class DataTable extends Component {
         ]
       },
       {
-        Header: 'Tier',
+        Header: 'AppDynamics',
+        headerClassName : "tableborder",
         columns: [
           {
             Header: "Name",
-            accessor: "tierName"
+            accessor: "tierName",
+            headerClassName : "tableborder",
+            className : "tableborder"
           },
           {
             Header: "Health",
