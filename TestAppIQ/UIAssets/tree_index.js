@@ -31,14 +31,14 @@ function getCookie(name) {
     return null;
 }
 
-window.APIC_DEV_COOKIE = getCookie("app_Cisco_AppIQTest_token");
-window.APIC_URL_TOKEN = getCookie("app_Cisco_AppIQTest_urlToken");
+window.APIC_DEV_COOKIE = getCookie("app_Cisco_TestAppIQ_token");
+window.APIC_URL_TOKEN = getCookie("app_Cisco_TestAppIQ_urlToken");
 
 function getData() {
     var apicHeaders = new Headers();
     // apicHeaders.append("DevCookie", window.APIC_DEV_COOKIE);
     // apicHeaders.append("APIC-challenge", window.APIC_URL_TOKEN);
-    // fetch(document.location.origin + '/appcenter/Cisco/AppIQTest/run.json?' + filter, {
+    // fetch(document.location.origin + '/appcenter/Cisco/TestAppIQ/run.json?' + filter, {
     //     method: 'GET',
     //     headers: apicHeaders
     // })
@@ -105,7 +105,7 @@ function getData() {
 }
 
 // var req = new XMLHttpRequest();
-// req.open('GET', document.location.origin + '/appcenter/Cisco/AppIQTest/run.json?' + filter, false);
+// req.open('GET', document.location.origin + '/appcenter/Cisco/TestAppIQ/run.json?' + filter, false);
 // req.onreadystatechange = function () {
 //     if (req.readyState == 4 && req.status == 200) {
 //         var jsonResponse = JSON.parse(req.responseText);

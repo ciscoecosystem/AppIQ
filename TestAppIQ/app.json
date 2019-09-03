@@ -3,7 +3,7 @@
         "graphql.json":"GraphQL Json"
     },
     "apicversion":"3.2(1l)",
-    "appid":"TesAppIQ",
+    "appid":"TestAppIQ",
     "author":"Nilay Shah, Devarshi Shah",
     "category":[
         "Visibility and Monitoring"
@@ -17,7 +17,7 @@
     "iconfile":"appdynamicsicon.png",
     "insertionURL":"fv:infoTenant:center",
     "metaversion":"1.1",
-    "name":"TesAppIQ",
+    "name":"TestAppIQ",
     "permissions":[
         "admin",
         "tenant-connectivity-mgmt",
