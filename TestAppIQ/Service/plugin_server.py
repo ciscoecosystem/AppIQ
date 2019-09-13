@@ -531,10 +531,7 @@ def getEpInfo(ep_children_list, aci_local_object):
         elif child_name == "fvRsCEpToPathEp":
             name = ep_child["fvRsCEpToPathEp"]["attributes"]["tDn"]
             pod_number = name.split("/pod-")[1].split("/")[0]
-            if (name.find("/protpaths") != -1):
-                node_number = name.split("/protpaths-")[1].split("/")[0]
-            else:
-                node_number = name.split("/paths-")[1].split("/")[0]
+            node_number = get_node_from_interface(name)
             eth_name = name.split("/pathep-[")[1][0:-1]
 
             iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
@@ -588,10 +585,7 @@ def getConfiguredAccessPolicies(tn, ap, epg):
             cap_dict["aep"] = cap_attr["attEntityP"].split("/attentp-")[1]
             cap_dict["iface_prof"] = cap_attr["accPortP"].split("/accportprof-")[1]
             cap_dict["pc_vpc"] = cap_attr["accBndlGrp"].split("/accportgrp-")[1]
-            if (cap_attr["pathEp"].find("/protpaths") != -1):
-                cap_dict["node"] = cap_attr["pathEp"].split("/protpaths-")[1].split("/pathep-")[0]
-            else:
-                cap_dict["node"] = cap_attr["pathEp"].split("/paths-")[1].split("/pathep-")[0]
+            cap_dict["node"] = get_node_from_interface(cap_attr["pathEp"])
             cap_dict["path_ep"] = cap_attr["pathEp"].split("/pathep-")[1][1:-1]
             cap_dict["vlan_pool"] = cap_attr["vLanPool"].split("/from-")[1]
 
@@ -1020,11 +1014,7 @@ def get_details(tenant, appId):
 
         for each in merged_data:
             epg_health = aci_local_object.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
-            
-            if (each['Interfaces'][0].find("/protpaths") != -1):
-                node = each['Interfaces'][0].split("/protpaths-")[1].split("/pathep-")[0]
-            else:
-                node = each['Interfaces'][0].split("/paths-")[1].split("/pathep-")[0]
+            node = get_node_from_interface(each['Interfaces'][0])
 
             details_list.append({
                 'IP': each['IP'],
@@ -1049,3 +1039,23 @@ def get_details(tenant, appId):
         setSleepVar(False)
         end_time =  datetime.datetime.now()
         logger.info("Time for GET_DETAILS: " + str(end_time - start_time))
+
+
+def get_node_from_interface(interface):
+    """This function extracts the node number from interface"""
+    if (interface.find("/protpaths") != -1):
+        node_number = interface.split("/protpaths-")[1].split("/")[0]
+    elif(interface.find("/paths-") != -1):
+        node_number = interface.split("/paths-")[1].split("/")[0]
+    elif(interface.find("/pathgrp-") != -1):
+        node_number = interface.split("/pathgrp-")[1].split("/")[0]
+    else:
+        try:
+            node_number = re.search(r'\/[a-zA-Z]*path[a-zA-Z]*-(.*)',interface)
+            if node_number is None:
+                raise Exception("interface"+str(interface))
+        except Exception as e:
+            node_number = '-'
+            logger.exception("Exception in get_node_from_interface:"+str(e))
+
+    return node_number
