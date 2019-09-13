@@ -1,1 +1,1 @@
-# TestAppIQ
+# AppIQ
