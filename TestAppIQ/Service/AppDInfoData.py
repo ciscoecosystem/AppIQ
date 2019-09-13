@@ -84,6 +84,9 @@ class AppD(object):
         try:
             apps_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/app/list/ids",
                                                  headers=self.headers, data=json.dumps(payload))
+            if apps_health.status_code == 404:
+                apps_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/app/list/ids",
+                                                 headers=self.headers, data=json.dumps(payload))
             if apps_health.status_code == 200:
                 return apps_health.json()  # ['data'][0]['severitySummary']['performanceState']
             else:
@@ -93,6 +96,9 @@ class AppD(object):
                     apps_health = self.appd_session.post(
                         self.host + ":" + self.port + "/controller/restui/app/list/ids",
                         headers=self.headers, data=json.dumps(payload))
+                    if apps_health.status_code == 404:
+                        apps_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/app/list/ids",
+                                                 headers=self.headers, data=json.dumps(payload))
                     if apps_health.status_code == 200:
                         return apps_health.json()
                     else:
@@ -123,6 +129,9 @@ class AppD(object):
                 self.host + ":" + self.port + "/controller/restui/tiers/list/health/ids",
                 headers=self.headers,
                 data=json.dumps(payload))
+            if tiers_health.status_code == 404:
+                tiers_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/tiers/list/health/ids",
+                                                 headers=self.headers, data=json.dumps(payload))
             if tiers_health.status_code == 200:
                 if 'data' in tiers_health.json():
                     if 'healthMetricStats' in tiers_health.json()['data'][0]:
@@ -141,6 +150,9 @@ class AppD(object):
                     tiers_health = self.appd_session.post(
                         self.host + ":" + self.port + "/controller/restui/tiers/list/health/ids", headers=self.headers,
                         data=json.dumps(payload))
+                    if tiers_health.status_code == 404:
+                        tiers_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/tiers/list/health/ids",
+                                                 headers=self.headers, data=json.dumps(payload))
                     if tiers_health.status_code == 200:
                         if 'data' in tiers_health.json():
                             if 'healthMetricStats' in tiers_health.json()['data'][0]:
@@ -180,6 +192,9 @@ class AppD(object):
                 self.host + ":" + self.port + "/controller/restui/nodes/list/health/ids",
                 headers=self.headers,
                 data=json.dumps(payload))
+            if nodes_health.status_code == 404:
+                nodes_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/nodes/list/health/ids",
+                                                 headers=self.headers, data=json.dumps(payload))
             if nodes_health.status_code == 200:
                 if 'data' in nodes_health.json():
                     if 'healthMetricStats' in nodes_health.json()['data'][0]:
@@ -198,6 +213,9 @@ class AppD(object):
                     nodes_health = self.appd_session.post(
                         self.host + ":" + self.port + "/controller/restui/nodes/list/health/ids", headers=self.headers,
                         data=json.dumps(payload))
+                    if nodes_health.status_code == 404:
+                        nodes_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/nodes/list/health/ids",
+                                                 headers=self.headers, data=json.dumps(payload))
                     if nodes_health.status_code == 200:
                         if 'data' in nodes_health.json():
                             if 'healthMetricStats' in nodes_health.json()['data'][0]:
