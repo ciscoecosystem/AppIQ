@@ -487,7 +487,7 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
         logger.exception("Exception while getting Children Ep Info : " + str(e))
         return json.dumps({
             "status_code": "300",
-            "message": str(e),
+            "message": {'errors':str(e)},
             "payload": []
         })
     finally:
@@ -530,12 +530,28 @@ def getEpInfo(ep_children_list, aci_local_object):
 
         elif child_name == "fvRsCEpToPathEp":
             name = ep_child["fvRsCEpToPathEp"]["attributes"]["tDn"]
-            pod_number = name.split("/pod-")[1].split("/")[0]
-            node_number = get_node_from_interface(name)
-            eth_name = name.split("/pathep-[")[1][0:-1]
-
-            iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
-            ep_info["iface_name"] = iface_name
+            if re.match('topology\/pod-+\d+\/pathgrp-.*',name):
+                pod_number = name.split("/pod-")[1].split("/")[0]
+                node_number = get_node_from_interface(name)
+                #The ethernet name is NOT available
+                eth_name = ''
+                iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
+                ep_info["iface_name"] = iface_name
+            elif re.match('topology\/pod-+\d+\/paths-\d+\/pathep-.*',name):
+                pod_number = name.split("/pod-")[1].split("/")[0]
+                node_number = get_node_from_interface(name)
+                eth_name = name.split("/pathep-[")[1][0:-1]
+                iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
+                ep_info["iface_name"] = iface_name
+            elif re.match('topology\/pod-+\d+\/protpaths-\d+\/pathep-.*',name):
+                pod_number = name.split("/pod-")[1].split("/")[0]
+                node_number = get_node_from_interface(name)
+                eth_name = name.split("/pathep-[")[1][0:-1]
+                iface_name = "Pod-" + pod_number + "/Node-" + node_number + "/" + eth_name
+                ep_info["iface_name"] = iface_name
+            else:
+                logger.error("Different format of interface is found: {}".format(name))
+                raise Exception("Different format of interface is found: {}".format(name))
 
         elif child_name == "fvRsVm":
             vm_dn = ep_child["fvRsVm"]["attributes"]["tDn"]
@@ -575,20 +591,57 @@ def getConfiguredAccessPolicies(tn, ap, epg):
                 "vlan_pool" : ""
             }
             cap_attr = cap["syntheticAccessPolicyInfo"]["attributes"]
-            
-            # Get Domain Name of Configure Access Policy
-            cap_vmm_prof = cap_attr["domain"].split("/vmmp-")[1].split("/")[0]
-            cap_domain_name = cap_attr["domain"].split("/dom-")[1]
+            if re.search("/vmmp-",cap_attr["domain"]):
+                # Get Domain Name of Configure Access Policy
+                cap_vmm_prof = cap_attr["domain"].split("/vmmp-")[1].split("/")[0]
+            else:
+                logger.error("Attribute {} not found".format("domain"))
+                raise Exception("Attribute {} not found".format("domain"))
+            if re.search("/dom-",cap_attr["domain"]):
+                cap_domain_name = cap_attr["domain"].split("/dom-")[1]
+            else:
+                logger.error("Attribute {} not found".format("domain"))
+                raise Exception("Attribute {} not found".format("domain"))
             cap_dict["domain"] = cap_vmm_prof + "/" + cap_domain_name
-
-            cap_dict["switch_prof"] = cap_attr["nodeP"].split("/nprof-")[1]
-            cap_dict["aep"] = cap_attr["attEntityP"].split("/attentp-")[1]
-            cap_dict["iface_prof"] = cap_attr["accPortP"].split("/accportprof-")[1]
-            cap_dict["pc_vpc"] = cap_attr["accBndlGrp"].split("/accportgrp-")[1]
+            if re.search("/nprof-",cap_attr["nodeP"]):
+                cap_dict["switch_prof"] = cap_attr["nodeP"].split("/nprof-")[1]
+            else:
+                logger.error("Attribute {} not found".format("nodeP"))
+                raise Exception("Attribute {} not found".format("nodeP"))
+            if re.search("/attentp-",cap_attr["attEntityP"]):
+                cap_dict["aep"] = cap_attr["attEntityP"].split("/attentp-")[1]
+            else:
+                logger.error("Attribute {} not found".format("attEntityP"))
+                raise Exception("Attribute {} not found".format("attEntityP"))
+            if re.search("/accportprof-",cap_attr["accPortP"]):
+                cap_dict["iface_prof"] = cap_attr["accPortP"].split("/accportprof-")[1]
+            else:
+                logger.error("Attribute {} not found".format("accPortP"))
+                raise Exception("Attribute {} not found".format("accPortP"))
+            if re.search("/accportgrp-",cap_attr["accBndlGrp"]):
+                cap_dict["pc_vpc"] = cap_attr["accBndlGrp"].split("/accportgrp-")[1]
+            elif re.search("/accbundle-",cap_attr["accBndlGrp"]):
+                cap_dict["pc_vpc"] = cap_attr["accBndlGrp"].split("/accbundle-")[1]
+            pc_pvc = re.search('\w+\/\w+\/\w+\/\w+-(.*)',cap_attr["accBndlGrp"])
+            if pc_pvc:
+                cap_dict["pc_vpc"] = pc_pvc.groups()[0]
+            else:
+                logger.error("Attribute {} not found".format("accBndlGrp"))
+                raise Exception("Attribute {} not found".format("accBndlGrp"))
             cap_dict["node"] = get_node_from_interface(cap_attr["pathEp"])
-            cap_dict["path_ep"] = cap_attr["pathEp"].split("/pathep-")[1][1:-1]
-            cap_dict["vlan_pool"] = cap_attr["vLanPool"].split("/from-")[1]
-
+            if not cap_dict["node"]:
+                logger.error("Attribute {} not found".format("node"))
+                raise Exception("attribute node not found")
+            if re.search("/pathep-",cap_attr["pathEp"]):
+                cap_dict["path_ep"] = cap_attr["pathEp"].split("/pathep-")[1][1:-1]
+            else:
+                logger.error("Attribute {} not found".format("pathEP"))
+                raise Exception("Attribute {} not found".format("pathEp"))
+            if re.search("/from-",cap_attr["vLanPool"]):
+                cap_dict["vlan_pool"] = cap_attr["vLanPool"].split("/from-")[1]
+            else:
+                logger.error("Attribute {} not found".format("vLanpool"))
+                raise Exception("Attribute {} not found".format("vLanpool"))
             cap_list.append(cap_dict)
         
         return json.dumps({
@@ -599,7 +652,7 @@ def getConfiguredAccessPolicies(tn, ap, epg):
     except Exception as ex:
         return json.dumps({
             "status_code": "300",
-            "message": str(ex),
+            "message": {'errors':str(ex)},
             "payload": []
         })
     finally:
@@ -669,10 +722,21 @@ def getToEpgTraffic(epg_dn):
                     vz_to_epg_child = to_epg_child["vzToEPg"]
 
                     to_epg_dn = vz_to_epg_child["attributes"]["epgDn"]
-                    tn = to_epg_dn.split("/tn-")[1].split("/")[0]
-                    ap = to_epg_dn.split("/ap-")[1].split("/")[0]
-                    epg = to_epg_dn.split("/epg-")[1]
-                    
+                    if re.match("/tn-",to_epg_dn):
+                        tn = to_epg_dn.split("/tn-")[1].split("/")[0]
+                    else :
+                        logger.error("attribute 'tn' not found in epgDn")
+                        raise Exception("attribute 'tn' not found in epgDn")
+                    if re.match("/ap-",to_epg_dn):
+                        ap = to_epg_dn.split("/ap-")[1].split("/")[0]
+                    else :
+                        logger.error("attribute 'ap' not found in epgDn")
+                        raise Exception("attribute 'ap' not found in epgDn")
+                    if re.match("/epg-",to_epg_dn):
+                        epg = to_epg_dn.split("/epg-")[1]
+                    else :
+                        logger.error("attribute 'epg' not found in epgDn")
+                        raise Exception("attribute 'epg' not found in epgDn")
                     parsed_to_epg_dn = tn + "/" + ap + "/" + epg
 
                     flt_attr_children = vz_to_epg_child["children"]
@@ -699,15 +763,34 @@ def getToEpgTraffic(epg_dn):
                         if traffic_id in to_epg_traffic_set:
                             to_epg_traffic_set.add(traffic_id)
                             continue
-                        
-                        flt_name = flt_attr_tdn.split("/fp-")[1]
+                        if re.match("/fp-",flt_attr_tdn):
+                            flt_name = flt_attr_tdn.split("/fp-")[1]
+                        else:
+                            logger.error("filter not found")
+                            raise Exception("filter not found")
                         flt_attr_subj_dn = flt_attr_child["children"][0]["vzCreatedBy"]["attributes"]["ownerDn"]
-                        subj_dn = flt_attr_subj_dn.split("/rssubjFiltAtt-")[0]
-
-                        subj_tn = flt_attr_subj_dn.split("/tn-")[1].split("/")[0]
-                        subj_ctrlr = flt_attr_subj_dn.split("/brc-")[1].split("/")[0]
-                        subj_name = flt_attr_subj_dn.split("/subj-")[1].split("/")[0]
-
+                        if re.match("/rssubjFiltAtt-",flt_attr_subj_dn):
+                            subj_dn = flt_attr_subj_dn.split("/rssubjFiltAtt-")[0]
+                        else:
+                            logger.error("filter attribute subject not found")
+                            raise Exception("filter attribute subject not found")
+                        if re.match("/tn-",flt_attr_subj_dn):
+                            subj_tn = flt_attr_subj_dn.split("/tn-")[1].split("/")[0]
+                        else:
+                            logger.error("filter attribute subject dn not found")
+                            raise Exception("filter attribute subject dn not found")
+                        
+                        if re.match("/brc-",flt_attr_subj_dn):
+                            subj_ctrlr = flt_attr_subj_dn.split("/brc-")[1].split("/")[0]
+                        else:
+                            logger.error("filter attribute ctrlr not found")
+                            raise Exception("filter attribute ctrlr not found")
+                        if re.match("/subj-",flt_attr_subj_dn):
+                            subj_name = flt_attr_subj_dn.split("/subj-")[1].split("/")[0]
+                        else:
+                            logger.error("filter attribute subj_name not found")
+                            raise Exception("filter attribute subj_name not found")
+                        
                         contract_subject = subj_tn + "/" + subj_ctrlr + "/" + subj_name
                         flt_list = getFilterList(flt_attr_tdn, aci_local_object)
                         ingr_pkts, egr_pkts = getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object)
@@ -731,7 +814,7 @@ def getToEpgTraffic(epg_dn):
             
             return json.dumps({
                 "status_code": "300",
-                "message": str(ex),
+                "message": {'errors':str(ex)},
                 "payload": []
             })
         finally:
@@ -1015,19 +1098,22 @@ def get_details(tenant, appId):
         for each in merged_data:
             epg_health = aci_local_object.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
             node = get_node_from_interface(each['Interfaces'][0])
-
-            details_list.append({
-                'IP': each['IP'],
-                'epgName': each['EPG'],
-                'epgHealth': epg_health,
-                'endPointName': each['VM-Name'],
-                'tierName': each['tierName'],
-                'tierHealth': each['tierHealth'],
-                'dn': each['dn'],
-                'mac': each['CEP-Mac'],
-                'interface': each['Interfaces'][0].split("/pathep-")[1][1:-1],
-                'node': node
-            })
+            if re.match("/pathep-",each['Interfaces'][0]):
+                details_list.append({
+                    'IP': each['IP'],
+                    'epgName': each['EPG'],
+                    'epgHealth': epg_health,
+                    'endPointName': each['VM-Name'],
+                    'tierName': each['tierName'],
+                    'tierHealth': each['tierHealth'],
+                    'dn': each['dn'],
+                    'mac': each['CEP-Mac'],
+                    'interface': each['Interfaces'][0].split("/pathep-")[1][1:-1],
+                    'node': node
+                })
+            else:
+                logger.error("pathEp not found.")
+                raise Exception("pathEp not found.")
 
         logger.info("UI Action details.json ended")
         details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
