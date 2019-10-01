@@ -313,6 +313,55 @@ class AppD(object):
             logger.info("Time for get_service_endpoints: " + str(end_time - start_time))
 
 
+    def get_node_mac(self, node_id):
+        start_time = datetime.datetime.now()
+        mac = []
+        try:
+            # self.appd_session
+            node_mac_details_response = self.appd_session.get(
+                str(self.host)+':'+ self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
+                    node_id) + '&output=JSON', auth=(self.user, self.password))
+            if node_mac_details_response.status_code == 200:
+                    #print('Fetched AppD Nodes for Tier -' + str(tier_id) + ', App - ' + str(app_id)) 
+                logger.info('Fetched mac for Nodes ' + str(node_id))
+                if node_mac_details_response.json() != []:
+                    for all_data in node_mac_details_response.json():
+                            interfaces = all_data['networkInterfaces']
+                            for interface in interfaces:
+                                mac.append(interface['macAddress'])
+                    return mac
+                else:
+                    return []
+            else:
+                # Refresh
+                self.check_connection()
+                try:
+                    # self.appd_session
+                    node_mac_details_response = self.appd_session.get(
+                str(self.host) + ':' + self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
+                    node_id) + '&output=JSON', auth=(self.user, self.password))
+                    if node_mac_details_response.status_code == 200:
+                    #print('Fetched AppD Nodes for Tier -' + str(tier_id) + ', App - ' + str(app_id)) 
+                        logger.info('Fetched mac for Nodes ' + str(node_id))
+                        if node_mac_details_response.json() != []:
+                            for all_data in node_mac_details_response.json():
+                                interfaces = all_data['networkInterfaces']
+                                for interface in interfaces:
+                                    mac.append(interface['macAddress'])
+                            return mac
+                        else:
+                            return []
+                    else:
+                        logger.info('did not found mac for Nodes ' + str(node_id))
+                        return []
+                except Exception as e:
+                    logger.info('did not found mac for Nodes ' + str(node_id))
+                    logger.exceptiom('Nodes API call failed,  ' + str(e))
+                    return []
+        except Exception as e:
+            logger.exception("error : "+str(e))
+
+
     def get_app_info(self):
         start_time = datetime.datetime.now()
         try:
@@ -873,7 +922,7 @@ class AppD(object):
                                     if tier.get('numberOfNodes') > 0:
                                         nodes = self.get_node_info(app.get('id'), tier.get('id'))
                                         ipList = []
-                                        #logger.info('Nodes for tier'+str(tier.get('id'))+', app:'+str(app.get('id')))
+                                        macList = []
                                         #logger.info(nodes)
                                         if len(nodes) > 0:
                                             for node in nodes:
@@ -902,12 +951,13 @@ class AppD(object):
                                                                 else:
                                                                     ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
                                                                     ipList.append(str(ipv4))
+                                                            # TODO: insert into macList and empty it at 962
                                                             self.databaseObject.checkIfExistsandUpdate('Nodes',
                                                                                                        [node.get('id'),
                                                                                                         str(node.get('name')),
                                                                                                         tier.get('id'),
                                                                                                         str(node_health),
-                                                                                                        ipList, app.get('id'), timeStamp])
+                                                                                                        ipList, app.get('id'), timeStamp, macList])
                                                             nodeidlist.append(node.get('id'))
                                                             ipList = []
                                                             logger.info(
