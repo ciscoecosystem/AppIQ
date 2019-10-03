@@ -151,15 +151,15 @@ class Recommend(object):
         ip_list = []
         if not appd_ips:
             return []
-        for each in appd_ips:
-            ip_list += each.ipAddress
+        for appd_ip in appd_ips:
+            ip_list.append(appd_ip.ipAddress)
         # aci_local_object = aci_local.ACI('10.23.239.23','admin','cisco123')
         # aci_local_object = aci_local.ACI('192.168.130.10','admin','Cisco!123')
         aci_local_object = aci_local.ACI_Local(tenant)
         end_points = aci_local_object.apic_fetchEPData(tenant)
         if not end_points:
             return []
-        #logger.info('ACI EPs found:'+str(end_points))
+
         try:
             parsed_eps = aci_local_object.parseEPsforTemp(end_points,tenant)
         except Exception as e:

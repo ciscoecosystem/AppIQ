@@ -268,14 +268,13 @@ def mapping(tenant, appDId):
         
         # returns the mapping from Mapping Table
         already_mapped_data = database_object.returnMapping(appId)
-        #logger.info('Already Mapped Data:'+str(already_mapped_data))
         rec_object = Recommend.Recommend()
         mapped_objects = rec_object.correlate_ACI_AppD(tenant, appDId)
-        logger.info('Post correlation of ACI and AppD')
-        #logger.info(mapped_objects)
+
         if not mapped_objects:
             logger.info('Empty Mapping dict for appDId:'+str(appDId))
             return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, "status_code": "200","message": "OK"})
+
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
             mapping_dict['target_cluster'] = already_mapped_data
@@ -283,7 +282,7 @@ def mapping(tenant, appDId):
             app_list = database_object.getappList()
             logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
             
-            # Why not get the App with given AppId from DB??
+            # TODO: Why not get the App with given AppId from DB?? with a where claws
             for each in app_list:
                 if each.get('appId') == appDId and each.get('isViewEnabled') == True:
                     logger.info("Mapping Empty!")
@@ -293,14 +292,18 @@ def mapping(tenant, appDId):
                         for entry in each['domains']:
                             if entry['recommended'] == True:
                                 target.append({'domainName': entry['domainName'], 'ipaddress': each['ipaddress']})
-                                mapping_dict['target_cluster'] = target
-                    data_list = []
+                        mapping_dict['target_cluster'] = target
                     logger.info('Target mapping for app:'+str(appDId))
+                    
+                    # TODO: why create data_list when target is the same.
+                    data_list = []
                     for mapping in target:
                         data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domainName']})
                     database_object.checkIfExistsandUpdate('Mapping', [appId, data_list])
-                    # saveMapping(appId,target)
+                    
+                    # TODO: See the use of enableView
                     view_enabled = enableView(appId, True)
+
         if mapped_objects:
             for new in mapped_objects:
                 mapping_dict['source_cluster'].append(new)
@@ -938,8 +941,6 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
     start_time = datetime.datetime.now()
     logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
     try:
-        # To change to ACI LOCAL
-        # aci_local_object = aci_local.ACI_Local(tenant)
         aci_login = aci_local_object.login()
         aci_data = aci_local_object.main()
 
@@ -949,23 +950,22 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
         # aci_object = aci_local.ACI("192.168.130.10", "admin", "Cisco!123")
         # aci_object = aci_local.ACI("10.23.239.23", "admin", "cisco123")
         # aci_data = aci_object.main(tenant)
-        # pprint.pprint(aci_data)
-        appId = str(appDId) + str(tenant)
-        mappings = database_object.returnMapping(appId)
+        
         merge_list = []
         merged_eps = []
-        epg_list = []
         total_epg_count = {}
         merged_epg_count = {}
         non_merged_ep_dict = {}
-        
+
+        appId = str(appDId) + str(tenant)
+        mappings = database_object.returnMapping(appId)
+
         for aci in aci_data:
-            if aci['EPG'] not in epg_list:
-                epg_list.append(aci['EPG'])
+            if aci['EPG'] not in total_epg_count.keys():
                 total_epg_count[aci['EPG']] = 1
             else:
                 total_epg_count[aci['EPG']] += 1
-            #     epg_count[aci['EPG']] = 1
+
             if mappings:
                 for each in mappings:
                     if aci['IP'] == each['ipaddress'] and each['domainName'] == str(aci['dn']):
@@ -980,24 +980,29 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                                         merged_epg_count[aci['EPG']] = [aci['IP']]
                                     else:
                                         merged_epg_count[aci['EPG']].append(aci['IP'])
+
         for aci in aci_data:
             if aci['IP'] not in merged_eps:
                 if aci['EPG'] not in non_merged_ep_dict:
                     non_merged_ep_dict[aci['EPG']] = {aci['CEP-Mac']: str(aci['IP'])}
                 else:
+                    # TODO: Check below if conditions
                     if not non_merged_ep_dict[aci['EPG']]:
                         non_merged_ep_dict[aci['EPG']] = {}
+
                     if aci['CEP-Mac'] in non_merged_ep_dict[aci['EPG']].keys():
                         multipleips = non_merged_ep_dict[aci['EPG']][aci['CEP-Mac']]+", " + str(aci['IP'])
                         non_merged_ep_dict[aci['EPG']].update({aci['CEP-Mac']: multipleips})
                     else:
                         non_merged_ep_dict[aci['EPG']].update({aci['CEP-Mac']: str(aci['IP'])})
+
         final_non_merged = {}
         if non_merged_ep_dict:
             for key,value in non_merged_ep_dict.items():
                 if not value:
                     continue
                 final_non_merged[key] = value
+
         fractions = {}
         if total_epg_count:
             for epg in total_epg_count.keys():
@@ -1005,6 +1010,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 un_map_eps = int(total_epg_count.get(epg, [])) - len(merged_epg_count.get(epg, []))
                 fractions[epg] = int(un_map_eps)
                 logger.info('Total Unmapped Eps (Inactive):'+str(un_map_eps))
+
         updated_merged_list = []
         if fractions:
             for key, value in fractions.iteritems():
@@ -1019,8 +1025,8 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 each['fraction'] = '0'
                 each['Non_IPs'] = {}
             final_list.append(each)
-        logger.info('Merge complete. Total objects correlated :'+str(len(final_list)))
-        return final_list#updated_merged_list#,total_epg_count # TBD for returning values
+        logger.info('Merge complete. Total objects correlated: ' + str(len(final_list)))
+        return final_list #updated_merged_list#,total_epg_count # TBD for returning values
     except Exception as e:
         logger.exception("Error while merge_aci_data : "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Merge ACI and AppDynamics objects. Error: "+str(e)})
@@ -1034,6 +1040,7 @@ def getappD(appId, ep):
     try:
         app = database_object.returnApplication('appId', appId)
         tiers = database_object.returnTiers('appId', appId)
+        # TODO: Check its use and remove this line
         hevs = database_object.returnHealthViolations('appId', appId)
         
         appd_list = []
@@ -1063,17 +1070,22 @@ def getappD(appId, ep):
                             }
                         )
                 nodes = database_object.returnNodes('tierId', tier.tierId)
-                #print "hevList"
-                #print hevList
                 for node in nodes:
                     if ep in node.ipAddress:
-                        appd_list.append({'appId': application.appId, 'appName': str(application.appName), 'appHealth': str(
-                            application.appMetrics['data'][0]['severitySummary']['performanceState']),
-                                          'tierId': tier.tierId, 'tierName': str(tier.tierName),
-                                          'tierHealth': str(tier.tierHealth),
-                                          'nodeId': node.nodeId, 'nodeName': str(node.nodeName),
-                                        'nodeHealth': str(node.nodeHealth), 'ipAddressList': node.ipAddress,
-                                        'serviceEndpoints': sepList, 'tierViolations': hevList})
+                        appd_list.append(
+                                { 
+                                    'appId': application.appId, 
+                                    'appName': str(application.appName), 
+                                    'appHealth': str(application.appMetrics['data'][0]['severitySummary']['performanceState']),
+                                    'tierId': tier.tierId, 'tierName': str(tier.tierName),
+                                    'tierHealth': str(tier.tierHealth),
+                                    'nodeId': node.nodeId,
+                                    'nodeName': str(node.nodeName),
+                                    'nodeHealth': str(node.nodeHealth),
+                                    'ipAddressList': node.ipAddress,
+                                    'serviceEndpoints': sepList, 
+                                    'tierViolations': hevList 
+                                })
         return appd_list
     except Exception as e:
         logger.exception("Could not load the View. Error: "+str(e))
@@ -1129,7 +1141,6 @@ def get_details(tenant, appId):
         logger.info("Time for GET_DETAILS: " + str(end_time - start_time))
 
 
-
 def get_node_from_interface(interfaces):
     """This function extracts the node number from interface"""
     node_number = ''
@@ -1181,6 +1192,8 @@ def get_node_from_interface(interfaces):
                 node_number += ''
                 logger.exception("Exception in get_node_from_interface:"+str(e))
     return node_number
+
+
 def get_all_interfaces(interfaces):
     interface_list = ''
     for interface in interfaces:

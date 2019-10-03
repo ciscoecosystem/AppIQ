@@ -314,50 +314,23 @@ class AppD(object):
 
 
     def get_node_mac(self, node_id):
-        start_time = datetime.datetime.now()
         mac = []
         try:
-            # self.appd_session
             node_mac_details_response = self.appd_session.get(
                 str(self.host)+':'+ self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
                     node_id) + '&output=JSON', auth=(self.user, self.password))
             if node_mac_details_response.status_code == 200:
-                    #print('Fetched AppD Nodes for Tier -' + str(tier_id) + ', App - ' + str(app_id)) 
                 logger.info('Fetched mac for Nodes ' + str(node_id))
                 if node_mac_details_response.json() != []:
                     for all_data in node_mac_details_response.json():
                             interfaces = all_data['networkInterfaces']
                             for interface in interfaces:
-                                mac.append(interface['macAddress'])
-                    return mac
-                else:
-                    return []
+                                mac.append(str(interface['macAddress']))
             else:
                 # Refresh
                 self.check_connection()
-                try:
-                    # self.appd_session
-                    node_mac_details_response = self.appd_session.get(
-                str(self.host) + ':' + self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
-                    node_id) + '&output=JSON', auth=(self.user, self.password))
-                    if node_mac_details_response.status_code == 200:
-                    #print('Fetched AppD Nodes for Tier -' + str(tier_id) + ', App - ' + str(app_id)) 
-                        logger.info('Fetched mac for Nodes ' + str(node_id))
-                        if node_mac_details_response.json() != []:
-                            for all_data in node_mac_details_response.json():
-                                interfaces = all_data['networkInterfaces']
-                                for interface in interfaces:
-                                    mac.append(interface['macAddress'])
-                            return mac
-                        else:
-                            return []
-                    else:
-                        logger.info('did not found mac for Nodes ' + str(node_id))
-                        return []
-                except Exception as e:
-                    logger.info('did not found mac for Nodes ' + str(node_id))
-                    logger.exceptiom('Nodes API call failed,  ' + str(e))
-                    return []
+                mac = self.get_node_mac(node_id)
+            return mac
         except Exception as e:
             logger.exception("error : "+str(e))
 
@@ -929,10 +902,12 @@ class AppD(object):
                                                 node_health = self.get_node_health(node.get('id'))
                                                 if node_health != 'UNDEFINED':
                                                     #logger.info('Node health:' + str(node_health))
-                                                    #continue
-                                                        
-                                                    if 'ipAddresses' in node:
 
+                                                    # get mac-address for node
+                                                    macList = self.get_node_mac(node.get('id'))
+
+                                                    # get ip-address for node
+                                                    if 'ipAddresses' in node:
                                                         # If 'ipAddresses' key is None, we make another API Call to get the Node Details
                                                         if not node.get('ipAddresses'):
                                                             node_details = self.get_node_details(app.get('id'), node.get('id'))                                                            
@@ -951,7 +926,6 @@ class AppD(object):
                                                                 else:
                                                                     ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
                                                                     ipList.append(str(ipv4))
-                                                            # TODO: insert into macList and empty it at 962
                                                             self.databaseObject.checkIfExistsandUpdate('Nodes',
                                                                                                        [node.get('id'),
                                                                                                         str(node.get('name')),

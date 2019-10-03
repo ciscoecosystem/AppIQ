@@ -413,6 +413,54 @@ class ACI_Local(object):
             logger.info("Time for apic_parseData: " + str(end_time - start_time))
 
 
+    def check_unicast_routing(self,bd):
+        url = self.proto + self.apic_ip + '/api/node/class/fvBD.json?query-target-filter=eq(fvBD.name,"{}")'.format(str(bd))
+        ep_response = self.ACI_get(url, cookie = {'APIC-Cookie': self.apic_token})
+        unicast_route = ""
+        try:
+            if json.loads(ep_response.text):
+                for fvcep in json.loads(ep_response.text)['imdata']:
+                    unicast_route = fvcep["fvBD"]["attributes"]["unicastRoute"]
+            return unicast_route
+        except Exception as e:
+            logger.exception("Exception found:"+str(e))
+
+
+    def fetch_ep_for_mac(self, mac):
+        url = self.proto + self.apic_ip + '/api/node/class/fvCEp.json?query-target-filter=eq(fvCEp.mac,"{}")'.format(str(mac))
+        ep_response = self.ACI_get(url, cookie = {'APIC-Cookie': self.apic_token})
+        return_val = ""
+        try:
+            if json.loads(ep_response.text):
+                for fvcep in json.loads(ep_response.text)['imdata']:
+                    dn = fvcep["fvCEp"]["attributes"]["dn"]
+                    dn_final = dn.split("/")[0:-1]
+                    counter = 0
+                    for dn_split in dn_final:
+                        if counter == 0:
+                            return_val += str(dn_split)
+                            counter += 1
+                        else:
+                            return_val += "/"+str(dn_split)
+            return return_val
+        except Exception as e:
+            logger.exception("Exception found:"+str(e))
+
+
+    def get_unicast_routing(self, mac):
+        try:
+            apic_token = self.apic_token
+            dn = self.fetch_ep_for_mac(mac)
+            bd = self.apic_fetchBD(dn, apic_token)
+            check = self.check_unicast_routing(bd)
+            if check == "yes":
+                return True
+            else:
+                return False
+        except Exception as e:
+            logger.exception("Exception found:"+str(e))
+
+
     def main(self):
         start_time = datetime.datetime.now()
         try:
@@ -420,10 +468,10 @@ class ACI_Local(object):
             logger.info('APIC Login success!')
             # ep_data = self.apic_fetchEPData(auth_token,self.tenant)
             # ep_data = self.apic_fetchEPData(self.tenant,apic_token=auth_token)
-            epg_data = self.apic_fetchEPGData(self.tenant,apic_token=auth_token)
-            #logger.info('EPG data in main:'+str(epg_data))
+            epg_data = self.apic_fetchEPGData(self.tenant, apic_token=auth_token)
+            # logger.debug('EPG data in main:'+str(epg_data))
             parse_data = self.apic_parseData(epg_data,apic_token=auth_token)
-            #logger.info('Parse data in main'+str(parse_data))
+            # logger.debug('Parse data in main'+str(parse_data))
             return parse_data
         except Exception as e:
             logger.exception('Exception in ACI Local Main, Error:'+str(e))
