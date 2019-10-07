@@ -1,30 +1,33 @@
 __author__ = 'nilayshah'
-#import ACI_Info as ACI_EPs
+
 import AppD_Alchemy as database
 import json, pprint
-# import ACI_Info as aci_local
 import ACI_Local as aci_local
 db_object = database.Database()
 from flask import current_app
-# aci_object = ACI_EPs.ACI('192.168.130.10', 'admin', 'Cisco!123')  # Change it later to ACI_Local
 from custom_logger import CustomLogger
 
 logger = CustomLogger.get_logger("/home/app/log/app.log")
 
 class Recommend(object):
 
-    # Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps dicts
     def getCommonEPs(self, appd_ip_list, aci_parsed_eps):
+        """Map EP(ACI) to Nodes(AppD)
+        
+        Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps dicts"""
+        
         common_list = []
         for each in aci_parsed_eps:
             if each['IP'] in appd_ip_list:
                 common_list.append(each)
         return common_list
 
+
     def extract(self,dn):
         ap = dn.split('/')[2].split('-',1)[1]
         epg = dn.split('/')[3].split('-',1)[1]
-        return ap,epg
+        return ap, epg
+
 
     # count_dict Example
     # count_dict = 
@@ -41,14 +44,15 @@ class Recommend(object):
     def extract_ap_and_epgs(self,eps):
         count_dict = {}
         for ep in eps:
-            ap,epg = self.extract(ep['dn'])
+            ap, epg = self.extract(ep['dn'])
             if ap not in count_dict.keys():
                 count_dict[ap] = {epg:1}
             elif epg not in count_dict[ap].keys():
                 count_dict[ap][epg] = 1
-            else:# epg in count_dict[ap].keys():
+            else:
                 count_dict[ap][epg] += 1
         return count_dict
+
 
     # returns a list of list
     def determine_recommendation(self,extract_ap_epgs,common_eps):
@@ -93,6 +97,7 @@ class Recommend(object):
                 if a[0] == b[0] and a[1] == b[1] and (a[2] == 'Yes' or a[2] == 'No') and b[2] == 'None':
                     ip2_list.remove(b)
         return ip2_list
+
 
     # Sample Return Value
     # [
@@ -143,19 +148,41 @@ class Recommend(object):
         return src_clus_list
 
 
-
-    def correlate_ACI_AppD(self, tenant, appId):
+    def correlate_aci_appd(self, tenant, appId):
         logger.info('Finding Correlations for ACI and AppD')
-        appd_ips = list(set(db_object.ipsforapp(appId)))
-        logger.info('AppD IPs: '+str(appd_ips))
+
+        aci_local_object = aci_local.ACI_Local(tenant)
+
+        appd_nodes = list(set(db_object.ipsforapp(appId)))
+        logger.info('AppD IPs: '+str(appd_nodes))
         ip_list = []
-        if not appd_ips:
+        mac_nodes_dict = {}
+        if not appd_nodes:
             return []
-        for appd_ip in appd_ips:
-            ip_list.append(appd_ip.ipAddress)
+        for node in appd_nodes:
+            if node.macAddress:
+                node_mac_list = node.macAddress
+                for node_mac in node_mac_list:
+                    if node_mac not in mac_nodes_dict.keys():
+                        mac_nodes_dict[node_mac] = [node]
+                    else:
+                        if node not in mac_nodes_dict[node_mac]:
+                            mac_nodes_dict[node_mac].append(node)
+
+                for node_mac,node in mac_nodes_dict:
+                    check,dn = aci_local_object.get_unicast_routing(node_mac)
+
+                    # if not dn:
+
+
+
+            # else:
+            #     ip_list += node.ipAddress
+            
+
         # aci_local_object = aci_local.ACI('10.23.239.23','admin','cisco123')
         # aci_local_object = aci_local.ACI('192.168.130.10','admin','Cisco!123')
-        aci_local_object = aci_local.ACI_Local(tenant)
+        # aci_local_object = aci_local.ACI_Local(tenant)
         end_points = aci_local_object.apic_fetchEPData(tenant)
         if not end_points:
             return []
@@ -163,18 +190,17 @@ class Recommend(object):
         try:
             parsed_eps = aci_local_object.parseEPsforTemp(end_points,tenant)
         except Exception as e:
-            logger.exception('Exception in parsed eps list, Error:'+str(e))
+            logger.exception('Exception in parsed eps list, Error: ' + str(e))
             return []
-        # end_points = aci_object.apic_fetchEPData(tenant)
-        # parsed_eps = aci_object.parseEPsforTemp(end_points, tenant)
-        
-        # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test/cep-00:50:56:92:BA:4A/ip-[20.20.20.10]"
         if not parsed_eps:
             return []
+
+        # Example of each EP dn
+        # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test/cep-00:50:56:92:BA:4A/ip-[20.20.20.10]"
+        # Example of extracted Epg dn
+        # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test"
         for each in parsed_eps:
             splitdn = '/'.join(each['dn'].split('/',4)[0:4])
-            # Example of extracted Epg dn
-            # uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test
             each['dn'] = splitdn
         try:
             common_eps = self.getCommonEPs(ip_list, parsed_eps)
@@ -208,8 +234,4 @@ class Recommend(object):
             return generated_list
         else:
             return []
-
-
-# rec = Recommend()
-# pprint.pprint(rec.correlate_ACI_AppD('AppDControllerTenant', 7))
 

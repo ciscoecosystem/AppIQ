@@ -454,9 +454,9 @@ class ACI_Local(object):
             bd = self.apic_fetchBD(dn, apic_token)
             check = self.check_unicast_routing(bd)
             if check == "yes":
-                return True
+                return True, dn
             else:
-                return False
+                return False, None
         except Exception as e:
             logger.exception("Exception found:"+str(e))
 

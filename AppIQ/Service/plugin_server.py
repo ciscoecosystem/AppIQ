@@ -262,54 +262,50 @@ def apps(tenant):
 def mapping(tenant, appDId):
     start_time = datetime.datetime.now()
     try:
-        #time.sleep(1)
         appId = str(appDId) + str(tenant)
         mapping_dict = {"source_cluster": [], "target_cluster": []}
         
         # returns the mapping from Mapping Table
         already_mapped_data = database_object.returnMapping(appId)
         rec_object = Recommend.Recommend()
-        mapped_objects = rec_object.correlate_ACI_AppD(tenant, appDId)
+        mapped_objects = rec_object.correlate_aci_appd(tenant, appDId)
 
         if not mapped_objects:
             logger.info('Empty Mapping dict for appDId:'+str(appDId))
-            return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, "status_code": "200","message": "OK"})
+            return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, 
+                               "status_code": "200","message": "OK"})
 
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
             mapping_dict['target_cluster'] = already_mapped_data
         else:
+            logger.info("Mapping Empty!")
             app_list = database_object.getappList()
             logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
             
             # TODO: Why not get the App with given AppId from DB?? with a where claws
-            for each in app_list:
-                if each.get('appId') == appDId and each.get('isViewEnabled') == True:
-                    logger.info("Mapping Empty!")
+            for app in app_list:
+                if app.get('appId') == appDId and app.get('isViewEnabled') == True:
                     target = []
-                    for each in mapped_objects:
-                        # print each
-                        for entry in each['domains']:
+                    for map_object in mapped_objects:
+                        for entry in map_object['domains']:
                             if entry['recommended'] == True:
-                                target.append({'domainName': entry['domainName'], 'ipaddress': each['ipaddress']})
+                                target.append({'domainName': entry['domainName'], 'ipaddress': map_object['ipaddress']})
                         mapping_dict['target_cluster'] = target
-                    logger.info('Target mapping for app:'+str(appDId))
                     
-                    # TODO: why create data_list when target is the same.
-                    data_list = []
-                    for mapping in target:
-                        data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domainName']})
-                    database_object.checkIfExistsandUpdate('Mapping', [appId, data_list])
+                    # Put mapping in DB
+                    database_object.checkIfExistsandUpdate('Mapping', [appId, target])
                     
                     # TODO: See the use of enableView
-                    view_enabled = enableView(appId, True)
+                    enableView(appId, True)
 
-        if mapped_objects:
-            for new in mapped_objects:
-                mapping_dict['source_cluster'].append(new)
+        for new_object in mapped_objects:
+            mapping_dict['source_cluster'].append(new_object)
 
-        return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, "status_code": "200",
-                           "message": "OK"})  # {"source_cluster": mapped_objects, "target_cluster": {{dn:IP},{dn:IP}}}
+        return json.dumps({"instanceName":getInstanceName(),
+                           "payload": mapping_dict, # {"source_cluster": mapped_objects, "target_cluster": {{dn:IP},{dn:IP}}}
+                           "status_code": "200",
+                           "message": "OK"})
     except Exception as e:
         logger.exception('Exception in Mapping, Error:'+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch mappings from the database. Error: "+str(e)})
