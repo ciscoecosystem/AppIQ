@@ -56,7 +56,6 @@ class ACI_Local(object):
             self.ep_url = self.proto + self.apic_ip + '/api/class/fvCEp.json'
             self.ip_url =  self.proto + self.apic_ip + '/api/class/fvIp.json'
             self.epg_url =  self.proto + self.apic_ip + '/api/class/fvAEPg.json'
-            self.ep_url =  self.proto + self.apic_ip + '/api/class/fvCEp.json'
         else:
             logger.error('Could not connect to APIC. Please verify your APIC connection.')
         # self.apic_token = self.apic_login()

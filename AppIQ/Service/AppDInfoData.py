@@ -944,7 +944,9 @@ class AppD(object):
                     self.databaseObject.checkAndDelete('ServiceEndpoints', sepList)
                     self.databaseObject.checkAndDelete('HealthViolations', violationList)
                     self.databaseObject.checkAndDelete('Nodes', nodeidlist)
-                    
+
+                    self.databaseObject.commitSession()
+
                     aci_local_object = aci_local.ACI_Local("")
 
                     self.check_and_wait_till_locked()

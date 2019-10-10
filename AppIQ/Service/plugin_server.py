@@ -275,6 +275,7 @@ def mapping(tenant, appDId):
             return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, 
                                "status_code": "200","message": "OK"})
 
+        logger.info("mapped_objects 111::"+str(mapped_objects))
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
             mapping_dict['target_cluster'] = already_mapped_data
@@ -290,7 +291,12 @@ def mapping(tenant, appDId):
                     for map_object in mapped_objects:
                         for entry in map_object['domains']:
                             if entry['recommended'] == True:
-                                target.append({'domainName': entry['domainName'], 'ipaddress': map_object['ipaddress']})
+                                if 'ipaddress' in map_object:
+                                    logger.debug("Mapping found with ipaddress for "+str(map_object))
+                                    target.append({'domainName': entry['domainName'], 'ipaddress': map_object['ipaddress']})
+                                elif 'macaddress' in map_object:
+                                    logger.debug("Mapping found with macaddress for "+str(map_object))
+                                    target.append({'domainName': entry['domainName'], 'macaddress': map_object['macaddress']})
                         mapping_dict['target_cluster'] = target
                     
                     # Put mapping in DB
@@ -323,6 +329,8 @@ def saveMapping(appDId, tenant, mappedData):
         mappedData_dict = json.loads(
             (str(mappedData).strip("'<>() ").replace('\'', '\"')))  # new implementation for GraphQL
         data_list = []
+
+        logger.info("mappedData_dict:::"+str(mappedData_dict))
         for mapping in mappedData_dict:
             data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domains'][0]['domainName']})
         if not data_list:
@@ -937,7 +945,6 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
     start_time = datetime.datetime.now()
     logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
     try:
-        aci_login = aci_local_object.login()
         aci_data = aci_local_object.main()
 
         # To run anywhere other than on the APIC
@@ -964,21 +971,28 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
 
             if mappings:
                 for each in mappings:
-                    if aci['IP'] == each['ipaddress'] and each['domainName'] == str(aci['dn']):
-                        appd_data = getappD(appDId, aci['IP'])
+                    # Check with IP or Mac 
+                    mapping_key = 'ipaddress'
+                    aci_key = 'IP'
+                    if 'macaddress' in each:
+                        mapping_key = 'macaddress'
+                        aci_key = 'CEP-Mac'
+                    
+                    if aci[aci_key] == each[mapping_key] and each['domainName'] == str(aci['dn']):
+                        # Change based on IP and Mac
+                        appd_data = getappD(appDId, aci[aci_key])
                         if appd_data:
                             for each in appd_data:
                                 each.update(aci)
                                 merge_list.append(each)
-                                if aci['IP'] not in merged_eps:
-                                    merged_eps.append(aci['IP'])
+                                if aci[aci_key] not in merged_eps:
+                                    merged_eps.append(aci[aci_key])
                                     if aci['EPG'] not in merged_epg_count:
-                                        merged_epg_count[aci['EPG']] = [aci['IP']]
+                                        merged_epg_count[aci['EPG']] = [aci[aci_key]]
                                     else:
-                                        merged_epg_count[aci['EPG']].append(aci['IP'])
-
+                                        merged_epg_count[aci['EPG']].append(aci[aci_key])
         for aci in aci_data:
-            if aci['IP'] not in merged_eps:
+            if aci['IP'] not in merged_eps and aci['CEP-Mac'] not in merged_eps:
                 if aci['EPG'] not in non_merged_ep_dict:
                     non_merged_ep_dict[aci['EPG']] = {aci['CEP-Mac']: str(aci['IP'])}
                 else:
@@ -1015,6 +1029,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                         each['fraction'] = value
                         each['Non_IPs'] = final_non_merged.get(key, {})
                         updated_merged_list.append(each)
+
         final_list = []
         for each in updated_merged_list:
             if 'fraction' not in each.keys():
@@ -1022,6 +1037,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 each['Non_IPs'] = {}
             final_list.append(each)
         logger.info('Merge complete. Total objects correlated: ' + str(len(final_list)))
+
         return final_list #updated_merged_list#,total_epg_count # TBD for returning values
     except Exception as e:
         logger.exception("Error while merge_aci_data : "+str(e))
@@ -1082,6 +1098,22 @@ def getappD(appId, ep):
                                     'serviceEndpoints': sepList, 
                                     'tierViolations': hevList 
                                 })
+                    elif ep in node.macAddress:
+                        appd_list.append(
+                                { 
+                                    'appId': application.appId, 
+                                    'appName': str(application.appName), 
+                                    'appHealth': str(application.appMetrics['data'][0]['severitySummary']['performanceState']),
+                                    'tierId': tier.tierId, 'tierName': str(tier.tierName),
+                                    'tierHealth': str(tier.tierHealth),
+                                    'nodeId': node.nodeId,
+                                    'nodeName': str(node.nodeName),
+                                    'nodeHealth': str(node.nodeHealth),
+                                    'ipAddressList': node.ipAddress,
+                                    'serviceEndpoints': sepList, 
+                                    'tierViolations': hevList,
+                                    'macAddressList': node.macAddress
+                                })                        
         return appd_list
     except Exception as e:
         logger.exception("Could not load the View. Error: "+str(e))

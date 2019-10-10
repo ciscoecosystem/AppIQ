@@ -349,7 +349,7 @@ class Database():
             elif table == 'ServiceEndpoints':
                 # sepId, sep, tierId
                 self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == data[0]).update(
-                    {'sep': data[1], 'tierId': data[2], 'timestamp': data[3]})
+                    {'sep': data[1], 'tierId': data[2], 'appId': data[3], 'timestamp': data[4]})
 
             elif table == 'HealthViolations':
                 # violationId, startTime, businessTransaction,description,severity,tierId,appId
@@ -786,6 +786,21 @@ class Database():
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not retrieve Application list. Error: " + str(
                                    e)})
+
+    
+    def getappbyId(self, id):
+        try:
+            app = self.session.query(Application).filter(Application.appId == id).first()
+            if app:
+                application = {'appId': app.appId, 'appName': str(app.appName),
+                               'appHealth': str(app.appMetrics['data'][0]['severitySummary']['performanceState']),
+                               'isViewEnabled': app.isViewEnabled}
+                return application
+            self.commitSession()
+        except Exception as e:
+            self.flushSession()
+
+        return None
 
 
     def enableViewUpdate(self, appId, bool):
