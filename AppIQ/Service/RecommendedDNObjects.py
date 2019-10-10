@@ -61,13 +61,16 @@ class Recommend(object):
         for each in common_eps:
             accounted = 0
             for duplicate in common_eps:
-                if 'IP' in duplicate:
-                    key = 'IP'
-                elif 'mac' in duplicate:
+
+                key = 'IP'
+                dup_key = 'IP'
+                if 'mac' in each:
                     key = 'mac'
+                if 'mac' in duplicate:
+                    dup_key = 'mac'
 
                 # For different elements, if IP/Mac is same and 'dn' is different
-                if each[key] == duplicate[key] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate):
+                if each[key] == duplicate[dup_key] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate):
                     ap_main,epg_main = self.extract(each['dn'])
                     ap_dup,epg_dup = self.extract(duplicate['dn'])
                     
@@ -92,7 +95,7 @@ class Recommend(object):
                             recommendation_list.append([each[key],each['dn'],'None',key])
                     else:
                         recommendation_list.append([each[key],each['dn'],'No',key])
-                elif each[key] != duplicate[key] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate) and any(each[key] in d for d in recommendation_list) != True:
+                elif each[key] != duplicate[dup_key] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate) and any(each[key] in d for d in recommendation_list) != True:
                     recommendation_list.append([each[key],each['dn'],'None',key])
                 elif accounted == 0:
                     recommendation_list.append([each[key],each['dn'],'None',key])
@@ -200,10 +203,12 @@ class Recommend(object):
         ip_list = []
         mac_nodes_dict = {}
         if not appd_nodes:
-            logger.exception('Error: appd_nodes')
+            logger.exception('Error: appd_nodes is Empty!')
             return []
+
         for node in appd_nodes:
             if node.macAddress:
+                logger.info('Node {} with MAC address {}'.format(str(node.nodeId), str(node.macAddress)))
                 node_mac_list = node.macAddress
                 for node_mac in node_mac_list:
                     if node_mac not in mac_nodes_dict.keys():
@@ -211,17 +216,19 @@ class Recommend(object):
                     else:
                         if node not in mac_nodes_dict[node_mac]:
                             mac_nodes_dict[node_mac].append(node)
-
-                for mac,nodes in mac_nodes_dict:
-                    check,dn = aci_local_object.get_unicast_routing(mac)
-
-                    if not check:
-                        for each_node in nodes:
-                            ip_list += each_node.ipAddress
-                    else:
-                        common_eps.append({'dn': str(dn), 'mac': str(mac), 'tenant': str(tenant)})
             else:
-                 ip_list += node.ipAddress
+                logger.info('Node {} with IP address {}'.format(str(node.nodeId), str(node.ipAddress)))
+                ip_list += node.ipAddress
+
+        logger.debug("mac_nodes_dict:::"+str(mac_nodes_dict))
+
+        for mac,nodes in mac_nodes_dict.items():
+            check,dn = aci_local_object.get_unicast_routing(mac)
+            if not check:
+                for each_node in nodes:
+                    ip_list += each_node.ipAddress
+            else:
+                common_eps.append({'dn': str(dn), 'mac': str(mac), 'tenant': str(tenant)})
 
         logger.debug('Final IP List ' + str(ip_list))
 

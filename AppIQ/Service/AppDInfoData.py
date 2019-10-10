@@ -315,7 +315,15 @@ class AppD(object):
 
     def get_node_mac(self, node_id):
         mac = []
+
         try:
+            # if node_id == 416:
+            #     mac.append('00:50:56:89:AA:BA')
+            #     return mac
+            # elif node_id == 420:
+            #     mac.append('00:50:56:89:AA:BA')
+            #     return mac
+
             node_mac_details_response = self.appd_session.get(
                 str(self.host)+':'+ self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
                     node_id) + '&output=JSON', auth=(self.user, self.password))
@@ -905,7 +913,7 @@ class AppD(object):
 
                                                     # get mac-address for node
                                                     macList = self.get_node_mac(node.get('id'))
-
+                                                    logger.info("mac list::"+str(macList)+" for node "+str(node.get("id")))
                                                     # get ip-address for node
                                                     if 'ipAddresses' in node:
                                                         # If 'ipAddresses' key is None, we make another API Call to get the Node Details
@@ -926,18 +934,18 @@ class AppD(object):
                                                                 else:
                                                                     ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
                                                                     ipList.append(str(ipv4))
-                                                            self.databaseObject.checkIfExistsandUpdate('Nodes',
-                                                                                                       [node.get('id'),
-                                                                                                        str(node.get('name')),
-                                                                                                        tier.get('id'),
-                                                                                                        str(node_health),
-                                                                                                        ipList, app.get('id'), timeStamp, macList])
-                                                            nodeidlist.append(node.get('id'))
-                                                            ipList = []
-                                                            logger.info(
-                                                                'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
-                                                                    app.get('name')) + ', Tier - ' + str(
-                                                                    tier.get('id')) + ', Node - ' + str(node.get('id')))
+
+                                                    self.databaseObject.checkIfExistsandUpdate('Nodes',
+                                                                                                [node.get('id'),
+                                                                                                str(node.get('name')),
+                                                                                                tier.get('id'),
+                                                                                                str(node_health),
+                                                                                                ipList, app.get('id'), timeStamp, macList])
+                                                    nodeidlist.append(node.get('id'))
+                                                    logger.info(
+                                                        'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
+                                                            app.get('name')) + ', Tier - ' + str(
+                                                            tier.get('id')) + ', Node - ' + str(node.get('id')))
                                                         
                     self.databaseObject.checkAndDelete('Application', appidList)
                     self.databaseObject.checkAndDelete('Tiers', tieridList)

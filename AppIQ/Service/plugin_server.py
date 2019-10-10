@@ -977,6 +977,8 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                     if 'macaddress' in each:
                         mapping_key = 'macaddress'
                         aci_key = 'CEP-Mac'
+                    elif 'IP' not in aci:
+                        continue
                     
                     if aci[aci_key] == each[mapping_key] and each['domainName'] == str(aci['dn']):
                         # Change based on IP and Mac
