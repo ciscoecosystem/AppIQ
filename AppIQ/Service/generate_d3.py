@@ -68,6 +68,10 @@ class generateD3Dict(object):
                     'Nodes': list(set([x['nodeName'] for x in epg_nodes])),
                     'Tier-Health': epg_nodes[0]['tierHealth']
                 }
+
+                if 'Machine Agent Enabled' in epg_nodes[0]:
+                    epg_dict['attributes']['Machine Agent Enabled'] = 'True'
+
                 # if (epg_dict['attributes']['Contracts']) == set(['None']):
                 #    del epg_dict['attributes']['Contracts']
                 # epg_dict['attributes'] = {

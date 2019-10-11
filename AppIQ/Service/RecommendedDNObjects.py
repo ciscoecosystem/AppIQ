@@ -176,14 +176,14 @@ class Recommend(object):
         aci_local_object = aci_local.ACI_Local(tenant)
         end_points = aci_local_object.apic_fetchEPData(tenant)
         if not end_points:
-            logger.info('Error: Empty end_points ' + str(end_points))
+            logger.error('Error: Empty end_points ' + str(end_points))
             return []
 
         try:
             # returns dn, ip and tenant info for each ep
             parsed_eps = aci_local_object.parseEPsforTemp(end_points,tenant)
             if not parsed_eps:
-                logger.info('Error: Empty parsed_eps ' + str(parsed_eps))
+                logger.error('Error: Empty parsed_eps ' + str(parsed_eps))
                 return []
             else:
                 # Example of each EP dn
@@ -225,6 +225,7 @@ class Recommend(object):
         for mac,nodes in mac_nodes_dict.items():
             check,dn = aci_local_object.get_unicast_routing(mac)
             if not check:
+                logger.info('Check failed for MAC address {}'.format(str(mac)))
                 for each_node in nodes:
                     ip_list += each_node.ipAddress
             else:

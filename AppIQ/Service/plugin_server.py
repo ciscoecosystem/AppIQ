@@ -30,7 +30,7 @@ database_object = Database.Database()
 d3Object = d3.generateD3Dict()
 
 
-def  getInstanceName():
+def getInstanceName():
     instance_path = '/home/app/data/credentials.json' # On APIC
     instance_exists = os.path.isfile(instance_path)
     if instance_exists:
@@ -963,6 +963,9 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
         appId = str(appDId) + str(tenant)
         mappings = database_object.returnMapping(appId)
 
+        logger.debug("ACI Data: {}".format(str(aci_data)))
+        logger.debug("Mapping Data: {}".format(str(mappings)))
+
         for aci in aci_data:
             if aci['EPG'] not in total_epg_count.keys():
                 total_epg_count[aci['EPG']] = 1
@@ -977,8 +980,6 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                     if 'macaddress' in each:
                         mapping_key = 'macaddress'
                         aci_key = 'CEP-Mac'
-                    elif 'IP' not in aci:
-                        continue
                     
                     if aci[aci_key] == each[mapping_key] and each['domainName'] == str(aci['dn']):
                         # Change based on IP and Mac
@@ -986,6 +987,8 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                         if appd_data:
                             for each in appd_data:
                                 each.update(aci)
+                                if aci_key == 'CEP-Mac':
+                                    each.update({'Machine Agent Enabled': 'True'})
                                 merge_list.append(each)
                                 if aci[aci_key] not in merged_eps:
                                     merged_eps.append(aci[aci_key])
@@ -994,7 +997,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                                     else:
                                         merged_epg_count[aci['EPG']].append(aci[aci_key])
         for aci in aci_data:
-            if aci['IP'] not in merged_eps and aci['CEP-Mac'] not in merged_eps:
+            if aci['IP'] not in merged_eps or aci['CEP-Mac'] not in merged_eps:
                 if aci['EPG'] not in non_merged_ep_dict:
                     non_merged_ep_dict[aci['EPG']] = {aci['CEP-Mac']: str(aci['IP'])}
                 else:
@@ -1111,10 +1114,9 @@ def getappD(appId, ep):
                                     'nodeId': node.nodeId,
                                     'nodeName': str(node.nodeName),
                                     'nodeHealth': str(node.nodeHealth),
-                                    'ipAddressList': node.ipAddress,
+                                    'macAddressList': node.macAddress,
                                     'serviceEndpoints': sepList, 
-                                    'tierViolations': hevList,
-                                    'macAddressList': node.macAddress
+                                    'tierViolations': hevList
                                 })                        
         return appd_list
     except Exception as e:
