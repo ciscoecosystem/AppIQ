@@ -57,8 +57,14 @@ class ClusterList extends React.Component {
             }
             /** </SUBTASK> */
 
-            if (item.ipaddress.indexOf(this.searchValue) > -1) {
-                filteredList.push(item);
+            if ('ipaddress' in item && item.ipaddress !== '') {
+                if (item.ipaddress.indexOf(this.searchValue) > -1) {
+                    filteredList.push(item);
+                }
+            } else {
+                if (item.macaddress.indexOf(this.searchValue) > -1) {
+                    filteredList.push(item);
+                }                
             }
         });
 
@@ -80,7 +86,7 @@ class ClusterList extends React.Component {
         rawListRaw.forEach(ip => {
             let listOfDomains = [];
             listOfDomains = ip.domains.map(item => {
-                let sourceToTarget = { "ipaddress": ip.ipaddress, "domainName": item.domainName };
+                let sourceToTarget = { "ipaddress": ip.ipaddress, "domainName": item.domainName, 'macaddress': ip.macaddress };
                 let classes = (this.props.selectedItem != null && this.props.selectedItem.domainName == item.domainName && this.props.selectedItem.ipaddress == ip.ipaddress) ? "selected" : "";
                 let recommendClass = (this.props.type == "source" && item.recommended != undefined && item.recommended == true) ? "recommended" : "not-recommended";
                 let tooltip = item.domainName;
@@ -101,12 +107,12 @@ class ClusterList extends React.Component {
 
             let classes = "li-item";
             if (this.props.type == "source") {
-                classes = (this.props.targetList.indexOf(ip.ipaddress) > -1) ? "disabled li-item" : "li-item";
+                classes = (this.props.targetList.indexOf(ip.ipaddress !== ''? ip.ipaddress: ip.macaddress) > -1) ? "disabled li-item" : "li-item";
             }
             processedList.push(
-                <li className={classes} key={ip.ipaddress}>
+                <li className={classes} key={ip.ipaddress !== ''? ip.ipaddress: ip.macaddress}>
                     <div className="ipaddress">
-                        {ip.ipaddress}
+                        {ip.ipaddress !== ''? ip.ipaddress: ip.macaddress}
                     </div>
                     <div className="domain-list">
                         <ul>

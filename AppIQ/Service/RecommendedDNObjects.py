@@ -171,8 +171,6 @@ class Recommend(object):
     def correlate_aci_appd(self, tenant, appId):
         logger.info('Finding Correlations for ACI and AppD')
 
-        # aci_local_object = aci_local.ACI('10.23.239.23','admin','cisco123')
-        # aci_local_object = aci_local.ACI('192.168.130.10','admin','Cisco!123')
         aci_local_object = aci_local.ACI_Local(tenant)
         end_points = aci_local_object.apic_fetchEPData(tenant)
         if not end_points:
@@ -181,7 +179,7 @@ class Recommend(object):
 
         try:
             # returns dn, ip and tenant info for each ep
-            parsed_eps = aci_local_object.parseEPsforTemp(end_points,tenant)
+            parsed_eps = aci_local_object.parseEPs(end_points,tenant)
             if not parsed_eps:
                 logger.error('Error: Empty parsed_eps ' + str(parsed_eps))
                 return []

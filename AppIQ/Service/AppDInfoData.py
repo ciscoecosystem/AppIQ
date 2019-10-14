@@ -314,34 +314,25 @@ class AppD(object):
 
 
     def get_node_mac(self, node_id):
+        """
+        Return mac addresses as array for given node Id.
+        """
         mac = []
-
         try:
-            # if node_id == 416:
-            #     mac.append('00:50:56:89:AA:BA')
-            #     return mac
-            # elif node_id == 420:
-            #     mac.append('00:50:56:89:AA:BA')
-            #     return mac
-
+            self.check_connection()
+            # Non documented API call to fetch mac for given node
             node_mac_details_response = self.appd_session.get(
                 str(self.host)+':'+ self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
                     node_id) + '&output=JSON', auth=(self.user, self.password))
             if node_mac_details_response.status_code == 200:
                 logger.info('Fetched mac for Nodes ' + str(node_id))
-                if node_mac_details_response.json() != []:
+                if node_mac_details_response.json():
                     for all_data in node_mac_details_response.json():
-                            interfaces = all_data['networkInterfaces']
-                            for interface in interfaces:
-                                mac.append(str(interface['macAddress']))
-            else:
-                # Refresh
-                self.check_connection()
-                mac = self.get_node_mac(node_id)
-            return mac
+                        for interface in all_data.get('networkInterfaces'):
+                            mac.append(str(interface['macAddress']))
         except Exception as e:
-            logger.exception("error : "+str(e))
-
+            logger.exception("error occured while getting mac for node : "+str(e))
+        return mac
 
     def get_app_info(self):
         start_time = datetime.datetime.now()
@@ -464,7 +455,6 @@ class AppD(object):
                                                                              'jsessionid': self.JSessionId,
                                                                              'content-type': 'application/json'},
                                                        data=json.dumps(payload))
-            # logger.info('HEV code -'+str(health_violations.status_code))
             if tier_id and str(health_violations.status_code) != "200":
                 self.check_connection()
                 try:
@@ -472,7 +462,6 @@ class AppD(object):
                                                                                      'jsessionid': self.JSessionId,
                                                                                      'content-type': 'application/json'},
                                                                data=json.dumps(payload))
-                    # logger.info('HEV code -'+str(health_violations.status_code))
                 except Exception as e:
                     logger.exception('HEV API call failed,  ' + str(e))
                     return []
@@ -481,7 +470,6 @@ class AppD(object):
                 if not health_violations:
                     return []
                 
-                #logger.info("=====health_violations======" + str(health_violations))
                 if 'entityMap' in health_violations:
                     for key1, val1 in health_violations.get('entityMap').iteritems():
                         key = str(key1).split(',')

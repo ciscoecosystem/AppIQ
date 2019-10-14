@@ -321,7 +321,7 @@ class ACI_Local(object):
 
 
     # Reads dn, ip and tenant for an fvIp and returns a list of those dictionaries
-    def parseEPsforTemp(self, data, tenant):
+    def parseEPs(self, data, tenant):
         resp = []
         for each in data:
             val = {'dn': str(each['fvIp']['attributes']['dn']), 'IP': str(each['fvIp']['attributes']['addr']),
@@ -413,6 +413,9 @@ class ACI_Local(object):
 
 
     def check_unicast_routing(self,bd):
+        """
+        Get unicast routing value for given bd. It returns "Yes" if enabled.
+        """
         url = self.proto + self.apic_ip + '/api/node/class/fvBD.json?query-target-filter=eq(fvBD.name,"{}")'.format(str(bd))
         ep_response = self.ACI_get(url, cookie = {'APIC-Cookie': self.apic_token})
         unicast_route = ""
@@ -422,10 +425,14 @@ class ACI_Local(object):
                     unicast_route = fvcep["fvBD"]["attributes"]["unicastRoute"]
             return unicast_route
         except Exception as e:
-            logger.exception("Exception found:"+str(e))
+            logger.exception("Exception occured while checking unicast routing:"+str(e))
+            return ""
 
 
     def fetch_ep_for_mac(self, mac):
+        """
+        Fetach ep value for given mac
+        """
         url = self.proto + self.apic_ip + '/api/node/class/fvCEp.json?query-target-filter=eq(fvCEp.mac,"{}")'.format(str(mac))
         ep_response = self.ACI_get(url, cookie = {'APIC-Cookie': self.apic_token})
         return_val = ""
@@ -441,12 +448,17 @@ class ACI_Local(object):
                             counter += 1
                         else:
                             return_val += "/"+str(dn_split)
-            return return_val
         except Exception as e:
-            logger.exception("Exception found:"+str(e))
+            logger.exception("Exception occured while fetching ep for mac:"+str(e))
+        return return_val
 
 
     def get_unicast_routing(self, mac):
+        """
+        Get unicast routing value for given mac.
+        If unicast routing is enabled then return true and dn.
+        Else return False and None.
+        """
         try:
             apic_token = self.apic_token
             dn = self.fetch_ep_for_mac(mac)
@@ -457,7 +469,8 @@ class ACI_Local(object):
             else:
                 return False, None
         except Exception as e:
-            logger.exception("Exception found:"+str(e))
+            logger.exception("Exception occured while get unicast routing:"+str(e))
+            return False, None
 
 
     def main(self):

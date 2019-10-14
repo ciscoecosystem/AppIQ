@@ -243,7 +243,7 @@ def apps(tenant):
                          'health': str(each['appHealth']), 'appId': each['appId']}
             app_list.append(temp_dict)
             if each.get('isViewEnabled') == True:
-                mapped_objects = mapping(tenant,each['appId'])
+                mapping(tenant,each['appId'])
         app_dict['app'] = app_list
         
         logger.info("UI Action app.json ended")
@@ -275,7 +275,6 @@ def mapping(tenant, appDId):
             return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, 
                                "status_code": "200","message": "OK"})
 
-        logger.info("mapped_objects 111::"+str(mapped_objects))
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
             mapping_dict['target_cluster'] = already_mapped_data
@@ -290,13 +289,13 @@ def mapping(tenant, appDId):
                     target = []
                     for map_object in mapped_objects:
                         for entry in map_object['domains']:
-                            if entry['recommended'] == True:
+                            if entry.get('recommended') == True:
                                 if 'ipaddress' in map_object:
                                     logger.debug("Mapping found with ipaddress for "+str(map_object))
-                                    target.append({'domainName': entry['domainName'], 'ipaddress': map_object['ipaddress']})
+                                    target.append({'domainName': entry.get('domainName'), 'ipaddress': map_object.get('ipaddress')})
                                 elif 'macaddress' in map_object:
                                     logger.debug("Mapping found with macaddress for "+str(map_object))
-                                    target.append({'domainName': entry['domainName'], 'macaddress': map_object['macaddress']})
+                                    target.append({'domainName': entry.get('domainName'), 'macaddress': map_object.get('macaddress')})
                         mapping_dict['target_cluster'] = target
                     
                     # Put mapping in DB
@@ -330,9 +329,11 @@ def saveMapping(appDId, tenant, mappedData):
             (str(mappedData).strip("'<>() ").replace('\'', '\"')))  # new implementation for GraphQL
         data_list = []
 
-        logger.info("mappedData_dict:::"+str(mappedData_dict))
         for mapping in mappedData_dict:
-            data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domains'][0]['domainName']})
+            if mapping.get('ipaddress') != "":
+                data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domains'][0]['domainName']})
+            elif mapping.get('macaddress') != "":
+                data_list.append({'macaddress': mapping['macaddress'], 'domainName': mapping['domains'][0]['domainName']})
         if not data_list:
             database_object.deleteEntry('Mapping', appId)
             #enableView(appDId, False)
@@ -929,7 +930,6 @@ def tree(tenantName, appId):
         setSleepVar(True)
         aci_local_object = aci_local.ACI_Local(tenantName)
         merged_data = merge_aci_appd(tenantName, appId, aci_local_object)
-        #logger.info("Merged data"+str(merged_data))
         response = json.dumps(d3Object.generate_d3_compatible_dict(merged_data))
         return json.dumps({"instanceName":getInstanceName(),"payload": response, "status_code": "200", "message": "OK"})
     except Exception as e:
@@ -942,6 +942,9 @@ def tree(tenantName, appId):
 
 
 def merge_aci_appd(tenant, appDId, aci_local_object):
+    """
+    Merge Aci data with App dynamics data fetched from DB
+    """
     start_time = datetime.datetime.now()
     logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
     try:
@@ -1053,6 +1056,9 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
 
 
 def getappD(appId, ep):
+    """
+    Get application data from App dynamics for given application Id
+    """
     start_time = datetime.datetime.now()
     try:
         app = database_object.returnApplication('appId', appId)
