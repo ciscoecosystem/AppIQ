@@ -1,30 +1,33 @@
 __author__ = 'nilayshah'
-#import ACI_Info as ACI_EPs
+
 import AppD_Alchemy as database
 import json, pprint
-# import ACI_Info as aci_local
 import ACI_Local as aci_local
 db_object = database.Database()
 from flask import current_app
-# aci_object = ACI_EPs.ACI('192.168.130.10', 'admin', 'Cisco!123')  # Change it later to ACI_Local
 from custom_logger import CustomLogger
 
 logger = CustomLogger.get_logger("/home/app/log/app.log")
 
 class Recommend(object):
 
-    # Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps dicts
     def getCommonEPs(self, appd_ip_list, aci_parsed_eps):
+        """Map EP(ACI) to Nodes(AppD)
+        
+        Matches the IP of ACI fvIp with AppD Node IPs and returns a list of matched ACI fvIps dicts"""
+        
         common_list = []
         for each in aci_parsed_eps:
             if each['IP'] in appd_ip_list:
                 common_list.append(each)
         return common_list
 
+
     def extract(self,dn):
         ap = dn.split('/')[2].split('-',1)[1]
         epg = dn.split('/')[3].split('-',1)[1]
-        return ap,epg
+        return ap, epg
+
 
     # count_dict Example
     # count_dict = 
@@ -41,23 +44,33 @@ class Recommend(object):
     def extract_ap_and_epgs(self,eps):
         count_dict = {}
         for ep in eps:
-            ap,epg = self.extract(ep['dn'])
+            ap, epg = self.extract(ep['dn'])
             if ap not in count_dict.keys():
                 count_dict[ap] = {epg:1}
             elif epg not in count_dict[ap].keys():
                 count_dict[ap][epg] = 1
-            else:# epg in count_dict[ap].keys():
+            else:
                 count_dict[ap][epg] += 1
         return count_dict
 
+
     # returns a list of list
     def determine_recommendation(self,extract_ap_epgs,common_eps):
-        ip2_list = []
+        recommendation_list = []
+        key = ''
         for each in common_eps:
             accounted = 0
             for duplicate in common_eps:
-                # For different elements, if IP is same and 'dn' is different
-                if each['IP'] == duplicate['IP'] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate):
+
+                key = 'IP'
+                dup_key = 'IP'
+                if 'mac' in each:
+                    key = 'mac'
+                if 'mac' in duplicate:
+                    dup_key = 'mac'
+
+                # For different elements, if IP/Mac is same and 'dn' is different
+                if each[key] == duplicate[dup_key] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate):
                     ap_main,epg_main = self.extract(each['dn'])
                     ap_dup,epg_dup = self.extract(duplicate['dn'])
                     
@@ -66,33 +79,34 @@ class Recommend(object):
                     dup_count = extract_ap_epgs[ap_dup][epg_dup]
                     
                     if main_count > dup_count:
-                        ip2_list.append([each['IP'],each['dn'],'Yes'])
+                        recommendation_list.append([each[key],each['dn'],'Yes',key])
                         break
                     elif main_count == dup_count:
                         ap_main_c = len(extract_ap_epgs[ap_main])
                         ap_dup_c = len(extract_ap_epgs[ap_dup])
                         # Add one with more number of Epgs
                         if ap_main_c > ap_dup_c:
-                            ip2_list.append([each['IP'],each['dn'],'Yes'])
+                            recommendation_list.append([each[key],each['dn'],'Yes',key])
                             break
                         elif ap_main_c < ap_dup_c:
-                            ip2_list.append([each['IP'],each['dn'],'No'])
+                            recommendation_list.append([each[key],each['dn'],'No',key])
                             break
                         else:
-                            ip2_list.append([each['IP'],each['dn'],'None'])
+                            recommendation_list.append([each[key],each['dn'],'None',key])
                     else:
-                        ip2_list.append([each['IP'],each['dn'],'No'])
-                elif each['IP'] != duplicate['IP'] and common_eps.index(each) != common_eps.index(duplicate) and each['dn'] != duplicate['dn'] and any(each['IP'] in d for d in ip2_list) != True:
-                    ip2_list.append([each['IP'],each['dn'],'None'])
+                        recommendation_list.append([each[key],each['dn'],'No',key])
+                elif each[key] != duplicate[dup_key] and each['dn'] != duplicate['dn'] and common_eps.index(each) != common_eps.index(duplicate) and any(each[key] in d for d in recommendation_list) != True:
+                    recommendation_list.append([each[key],each['dn'],'None',key])
                 elif accounted == 0:
-                    ip2_list.append([each['IP'],each['dn'],'None'])
+                    recommendation_list.append([each[key],each['dn'],'None',key])
                     accounted = 1
 
-        for a in ip2_list:
-            for b in ip2_list:
+        for a in recommendation_list:
+            for b in recommendation_list:
                 if a[0] == b[0] and a[1] == b[1] and (a[2] == 'Yes' or a[2] == 'No') and b[2] == 'None':
-                    ip2_list.remove(b)
-        return ip2_list
+                    recommendation_list.remove(b)
+        return recommendation_list
+
 
     # Sample Return Value
     # [
@@ -126,67 +140,109 @@ class Recommend(object):
     def generatelist(self,ipList):
         src_clus_list = []
         ips = []
+        macs = []
         for each in ipList:
-            ips.append(each[0])
+            if each[3] == 'IP':
+                ips.append(each[0])
+            else:
+                macs.append(each[0])
         ips = list(set(ips))
-        new_dict = dict((el,[]) for el in ips)
+        macs = list(set(macs))
+        ip_dict = dict((el,[]) for el in ips)
+        mac_dict = dict((el,[]) for el in macs)
         for each in ipList:
             if each[2] == 'No':
                 each[2] = False
             if each[2] == 'Yes' or each[2] == 'None':
                 each[2] = True
-            new_dict[each[0]].append({'domainName':each[1],'recommended':each[2]})
-        for key,value in new_dict.iteritems():
+            if each[3] == 'IP':
+                ip_dict[each[0]].append({'domainName':each[1],'recommended':each[2]})
+            else:
+                mac_dict[each[0]].append({'domainName':each[1],'recommended':each[2]})
+        for key,value in ip_dict.iteritems():
             entry = {'ipaddress':key,'domains':value}
             src_clus_list.append(entry)
-
+        for key,value in mac_dict.iteritems():
+            entry = {'macaddress':key,'domains':value}
+            src_clus_list.append(entry)
         return src_clus_list
 
 
-
-    def correlate_ACI_AppD(self, tenant, appId):
+    def correlate_aci_appd(self, tenant, appId):
         logger.info('Finding Correlations for ACI and AppD')
-        appd_ips = list(set(db_object.ipsforapp(appId)))
-        logger.info('AppD IPs: '+str(appd_ips))
-        ip_list = []
-        if not appd_ips:
-            return []
-        for each in appd_ips:
-            ip_list += each.ipAddress
-        # aci_local_object = aci_local.ACI('10.23.239.23','admin','cisco123')
-        # aci_local_object = aci_local.ACI('192.168.130.10','admin','Cisco!123')
+
         aci_local_object = aci_local.ACI_Local(tenant)
         end_points = aci_local_object.apic_fetchEPData(tenant)
         if not end_points:
+            logger.error('Error: Empty end_points ' + str(end_points))
             return []
-        #logger.info('ACI EPs found:'+str(end_points))
+
         try:
-            parsed_eps = aci_local_object.parseEPsforTemp(end_points,tenant)
+            # returns dn, ip and tenant info for each ep
+            parsed_eps = aci_local_object.parseEPs(end_points,tenant)
+            if not parsed_eps:
+                logger.error('Error: Empty parsed_eps ' + str(parsed_eps))
+                return []
+            else:
+                # Example of each EP dn
+                # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test/cep-00:50:56:92:BA:4A/ip-[20.20.20.10]"
+                # Example of extracted Epg dn
+                # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test"
+                for each in parsed_eps:
+                    each['dn'] = '/'.join(each['dn'].split('/',4)[0:4])
         except Exception as e:
-            logger.exception('Exception in parsed eps list, Error:'+str(e))
+            logger.exception('Exception in parsed eps list, Error: ' + str(e))
             return []
-        # end_points = aci_object.apic_fetchEPData(tenant)
-        # parsed_eps = aci_object.parseEPsforTemp(end_points, tenant)
-        
-        # "uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test/cep-00:50:56:92:BA:4A/ip-[20.20.20.10]"
-        if not parsed_eps:
+
+        common_eps = []
+        # Get all nodes for the app
+        appd_nodes = list(set(db_object.ipsforapp(appId)))
+        logger.info('AppD IPs: '+str(appd_nodes))
+        ip_list = []
+        mac_nodes_dict = {}
+        if not appd_nodes:
+            logger.exception('Error: appd_nodes is Empty!')
             return []
-        for each in parsed_eps:
-            splitdn = '/'.join(each['dn'].split('/',4)[0:4])
-            # Example of extracted Epg dn
-            # uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-test
-            each['dn'] = splitdn
+
+        for node in appd_nodes:
+            if node.macAddress:
+                logger.info('Node {} with MAC address {}'.format(str(node.nodeId), str(node.macAddress)))
+                node_mac_list = node.macAddress
+                for node_mac in node_mac_list:
+                    if node_mac not in mac_nodes_dict.keys():
+                        mac_nodes_dict[node_mac] = [node]
+                    else:
+                        if node not in mac_nodes_dict[node_mac]:
+                            mac_nodes_dict[node_mac].append(node)
+            else:
+                logger.info('Node {} with IP address {}'.format(str(node.nodeId), str(node.ipAddress)))
+                ip_list += node.ipAddress
+
+        logger.debug("mac_nodes_dict:::"+str(mac_nodes_dict))
+
+        for mac,nodes in mac_nodes_dict.items():
+            check,dn = aci_local_object.get_unicast_routing(mac)
+            if not check:
+                logger.info('Check failed for MAC address {}'.format(str(mac)))
+                for each_node in nodes:
+                    ip_list += each_node.ipAddress
+            else:
+                common_eps.append({'dn': str(dn), 'mac': str(mac), 'tenant': str(tenant)})
+
+        logger.debug('Final IP List ' + str(ip_list))
+
+        # Extract common based on Ips
         try:
-            common_eps = self.getCommonEPs(ip_list, parsed_eps)
+            common_eps += self.getCommonEPs(ip_list, parsed_eps)
             logger.info('Common EPs:'+str(common_eps))
+            if common_eps:
+                extract_ap_epgs = self.extract_ap_and_epgs(common_eps)
+            else:
+                return []
         except Exception as e:
             logger.exception('Exception in common eps list, Error:'+str(e))
             return []
 
-        if common_eps:
-            extract_ap_epgs = self.extract_ap_and_epgs(common_eps)
-        else:
-            return []
         try:
             rec_list = self.determine_recommendation(extract_ap_epgs,common_eps)
         except Exception as e:
@@ -196,7 +252,9 @@ class Recommend(object):
             logger.info('Recommendation list for app:'+str(appId)+'  rec_list= '+str(rec_list))
             fin_list = set(map(tuple,rec_list))
             final_list = map(list,fin_list)
+            logger.info('Final List final_list '+str(rec_list))
         else:
+            logger.info('Error: Empty rec_list ' + str(rec_list))
             return []
         try:
             generated_list = self.generatelist(final_list)
@@ -207,9 +265,6 @@ class Recommend(object):
             logger.info('Generated List = '+str(generated_list))
             return generated_list
         else:
+            logger.info('Error: Empty generated_list ' + str(generated_list))
             return []
-
-
-# rec = Recommend()
-# pprint.pprint(rec.correlate_ACI_AppD('AppDControllerTenant', 7))
 

@@ -97,13 +97,28 @@ class Container extends React.Component {
 
         let sourceJsonData = mappings_json_data.source_cluster;
         let targetJsonData = mappings_json_data.target_cluster;
+        
+        sourceJsonData.forEach(item => {
+            if ("ipaddress" in item) {
+                item["macaddress"] = "";
+            } else {
+                item["ipaddress"] = "";
+            }
+        });
 
         let newTargetJsonData = targetJsonData.map(item => {
-            let ipaddress = item.ipaddress;
+            let ipaddress = '';
+            if ("ipaddress" in item) {
+                ipaddress = item.ipaddress;
+            }
             let domainName = item.domainName;
-
+            let macaddress = '';
+            if ("macaddress" in item) {
+                macaddress = item.macaddress;
+            }
             let newObject = {
                 "ipaddress": ipaddress,
+                "macaddress": macaddress,
                 "domains": [
                     {
                         "domainName": domainName
@@ -113,7 +128,7 @@ class Container extends React.Component {
 
             return newObject
         });
-
+        
         targetJsonData = newTargetJsonData;
 
         this.state = {
@@ -159,10 +174,11 @@ class Container extends React.Component {
             return;
         }
 
-        let newIPaddress = newItem.ipaddress
+        let newIPaddress = newItem.ipaddress? newItem.ipaddress: '';
         let newDomainName = newItem.domainName;
+        let newMacaddress = newItem.macaddress? newItem.macaddress: '';
 
-        let newObjectString = '{"ipaddress" : "' + newIPaddress + '","domains" : [{"domainName" : "' + newDomainName + '","recommended" : true}]}'
+        let newObjectString = '{"ipaddress" : "' + newIPaddress + '","macaddress" : "'+ newMacaddress +'" ,"domains" : [{"domainName" : "' + newDomainName + '","recommended" : true}]}'
         const newObject = JSON.parse(newObjectString);
 
         //check if element already exist
@@ -277,7 +293,11 @@ class Container extends React.Component {
 
     render() {
         let existingTargetList = this.state.targetClusterList.map(item => {
-            return item.ipaddress;
+            if (item.ipaddress != '') {
+                return item.ipaddress;
+            } else if (item.macaddress != '') {
+                return item.macaddress;
+            }
         });
 
         let addEnabled = (this.state.sourceSelected == null) ? "button-disabled" : "";

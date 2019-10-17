@@ -15,7 +15,6 @@ import datetime
 import time, json
 from custom_logger import CustomLogger
 
-# app.debug = True
 Base = declarative_base()
 logger = CustomLogger.get_logger("/home/app/log/app.log")
 
@@ -83,7 +82,9 @@ class HealthViolations(Base):
     evaluationStates = Column(PickleType)
     tierId = Column(Integer, ForeignKey('Tiers.tierId'))
     appId = Column(Integer, ForeignKey('Application.appId'))
-    # violationId, startTime, businessTransaction,description,severity,tierId,appId
+
+    # TODO: Correct or remove following comment
+    # violationId, startTime, businessTransaction, description, severity, tierId, appId
     def __init__(self, violationId, startTime, businessTransaction, description, severity, tierId, appId, timestamp, endTime, status, evaluationStates):
         self.violationId = violationId
         self.startTime = startTime
@@ -107,8 +108,9 @@ class Nodes(Base):
     ipAddress = Column(PickleType)
     timestamp = Column(DateTime)
     appId = Column(Integer, ForeignKey('Application.appId'))
+    macAddress = Column(PickleType)
 
-    def __init__(self, nodeId, nodeName, tierId, nodeHealth, ipList, appId, timestamp):
+    def __init__(self, nodeId, nodeName, tierId, nodeHealth, ipList, appId, timestamp, macList):
         self.nodeId = nodeId
         self.nodeName = nodeName
         self.tierId = tierId
@@ -116,6 +118,7 @@ class Nodes(Base):
         self.ipAddress = ipList
         self.appId = appId
         self.timestamp = timestamp
+        self.macAddress = macList
 
 
 class EpgHistory(Base):
@@ -253,133 +256,112 @@ class Database():
         self.session = Session(bind=self.conn)
 
 
-    def createTables(self):  # Add Exception
-        #start_time = datetime.datetime.now()
+    def createTables(self):
         try:
             self.metadata.create_all(self.engine)
             return None
         except Exception as e:
             logger.exception('Exception in creating tables: ' + str(e))
-            # Log: internal backend error: could not create tables
             return None
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for createTable: " + str(end_time - start_time))
 
 
     def flushSession(self):
-        #start_time = datetime.datetime.now()
         try:
             logger.info('Session Flushed!')
             self.session.flush()
         except Exception as e:
             logger.exception('Could not flush the session! Error:' + str(e))
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for flishSession: " + str(end_time - start_time))
 
 
     def commitSession(self):
-        #start_time = datetime.datetime.now()
         try:
             self.session.commit()
-        # logger.info('Session Commited!')
-        # Log: internal backend error: could not create tables
-        # return "Session Committed"
+            # logger.info('Session Commited!')
         except Exception as e:
             logger.exception('Exception in Committing session: ' + str(e))
             self.flushSession()
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for commitSession: " + str(end_time - start_time))
 
 
+    # TODO: correct the comment with name of all the fields for all the tables
     def insertInto(self, table, data):
-        #start_time = datetime.datetime.now()
         try:
             if table == 'Mapping':
                 #  appId, mapped_data [{dn, ipAddress}]
                 self.session.add(Mapping(data[0], data[1]))
 
-            if table == 'Application':
+            elif table == 'Application':
                 # appId, appName, appMetrics
                 self.session.add(Application(data[0], str(data[1]), data[2], data[3]))
                 # return self.session.query(Application).filter(Application.appId == data[0])
 
-            if table == 'Tiers':
+            elif table == 'Tiers':
                 # tierId, tierName, appId, tierHealth
                 self.session.add(Tiers(data[0], str(data[1]), data[2], data[3]))
                 # self.session.add(Tiers(data[0], data[1], data[2], data[3]))
 
-            if table == 'Nodes':
-                # nodeId, nodeName, tierId,nodeHealth, ipAddress, appId
-                self.session.add(Nodes(data[0], data[1], data[2], data[3], data[4], data[5], data[6]))
+            elif table == 'Nodes':
+                # nodeId, nodeName, tierId, nodeHealth, ipAddress, appId, timestamp, macAddress
+                self.session.add(Nodes(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]))
 
-            if table == 'ServiceEndpoints':
+            elif table == 'ServiceEndpoints':
                 # sepId, sep, tierId, appId
                 self.session.add(ServiceEndpoints(data[0], data[1], data[2], data[3], data[4]))
 
-            if table == 'HealthViolations':
+            elif table == 'HealthViolations':
                 # violationId, startTime, businessTransaction,description,severity,tierId,appId
                 self.session.add(HealthViolations(data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8], data[9], data[10]))
 
-            if table == 'ACItemp':
+            elif table == 'ACItemp':
                 # IP, dn, appId, selector (0 or 1)
                 self.session.add(ACItemp(data[0], data[1], data[2]))
 
-            if table == 'ACIPerm':
+            elif table == 'ACIPerm':
                 # IP, dn, appId
                 self.session.add(ACIperm(data[0], data[1], data[2], data[3]))
-                # self.commitSession()
-                # logger.info('Values populated into Table '+str(table))
+
         except Exception as e:
             logger.exception('Exception in Insert: ' + str(e))
             self.commitSession()
-            # return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not insert into database. Error: "+str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for insertInto: " + str(end_time - start_time))
 
 
     def update(self, table, data):
-        #start_time = datetime.datetime.now()
         try:
             if table == 'Mapping':
                 self.session.query(Mapping).filter(Mapping.appId == data[0]).update({'mapped_data': data[1]})
 
-            if table == 'Application':
+            elif table == 'Application':
                 # appId, appName, appMetrics
                 self.session.query(Application).filter(Application.appId == data[0]).update(
                     {'appName': str(data[1]), 'appMetrics': data[2], 'timestamp': data[3]})
                 # return self.session.query(Application).filter(Application.appId == data[0])
 
-            if table == 'Tiers':
+            elif table == 'Tiers':
                 # tierId, tierName, appId, tierHealth
                 self.session.query(Tiers).filter(Tiers.tierId == data[0]).update(
                     {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3]})
 
-            if table == 'Nodes':
-                # nodeId, nodeName, tierId, nodeHealth, ipAddress
+            elif table == 'Nodes':
+                # nodeId, nodeName, tierId, nodeHealth, ipAddress, appId, timestamp, macAddress
                 self.session.query(Nodes).filter(Nodes.nodeId == data[0]).update(
-                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4], 'appId': data[5], 'timestamp': data[6]})
+                    {'nodeName': data[1], 'tierId': data[2], 'nodeHealth': data[3], 'ipAddress': data[4],
+                     'appId': data[5], 'timestamp': data[6], 'macAddress': data[7]})
 
-            if table == 'ServiceEndpoints':
+            elif table == 'ServiceEndpoints':
                 # sepId, sep, tierId
                 self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == data[0]).update(
-                    {'sep': data[1], 'tierId': data[2], 'timestamp': data[3]})
-                #
-            if table == 'HealthViolations':
+                    {'sep': data[1], 'tierId': data[2], 'appId': data[3], 'timestamp': data[4]})
+
+            elif table == 'HealthViolations':
                 # violationId, startTime, businessTransaction,description,severity,tierId,appId
                 self.session.query(HealthViolations).filter(HealthViolations.violationId == data[0]).update(
                     {'startTime': data[1], 'businessTransaction': data[2], 'description': data[3], 'severity': data[4],
                      'tierId': data[5], 'appId': data[6], 'timestamp': data[7]}, synchronize_session='fetch')
-                #
-            if table == 'ACItemp':
+
+            elif table == 'ACItemp':
                 # IP, dn, appId, selector (0 or 1)
                 self.session.query(ACItemp).filter(ACItemp.dn == data[0]).update({'IP': data[1], 'tenant': data[2]})
 
-                #
-            if table == 'ACIPerm':
+            elif table == 'ACIPerm':
                 # IP, dn, appId
                 self.session.query(Tiers).filter(Tiers.tierId == data[0]).update(
                     {'tierName': data[1], 'appId': data[2], 'tierHealth': data[3]})
@@ -389,31 +371,26 @@ class Database():
         except Exception as e:
             logger.exception('Exception in Update:' + str(e))
             self.commitSession()
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for update: " + str(end_time - start_time))
 
 
     def returnValues(self, table):
-        #start_time = datetime.datetime.now()
         try:
             if table == 'Mapping':
                 return self.session.query(Mapping).all()
-            if table == 'Application':
-                # query = self.session.query(Application).all()
+            elif table == 'Application':
                 return self.session.query(Application).all()
                 # return self.session.query(Application).filter(Application.appId == data[0])
-            if table == 'Tiers':
+            elif table == 'Tiers':
                 return self.session.query(Tiers).all()
-            if table == 'Nodes':
+            elif table == 'Nodes':
                 return self.session.query(Nodes).all()
-            if table == 'ServiceEndpoints':
+            elif table == 'ServiceEndpoints':
                 return self.session.query(ServiceEndpoints).all()
-            if table == 'HealthViolations':
+            elif table == 'HealthViolations':
                 return self.session.query(HealthViolations).all()
-            if table == 'ACItemp':
+            elif table == 'ACItemp':
                 return self.session.query(ACItemp).all()
-            if table == 'ACIperm':
+            elif table == 'ACIperm':
                 return self.session.query(ACIperm).all()
             else:
                 return []
@@ -421,66 +398,68 @@ class Database():
             logger.exception('Exception in returning values for table: ' + str(table) + ', Error:' + str(e))
             self.commitSession()
             return []
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnValues: " + str(end_time - start_time))
 
 
     def deleteEntry(self, table, deleteid):
-        #start_time = datetime.datetime.now()
         try:
             logger.info('To delete from table: ' + str(table) + '; id -' + str(deleteid))
             if table == 'Application':
                 self.session.query(Application).filter(Application.appId == int(deleteid)).delete()
 
-            if table == 'Mapping':
+            elif table == 'Mapping':
                 self.session.query(Mapping).filter(Mapping.appId == str(deleteid)).delete()
 
-            if table == 'Tiers':
+            elif table == 'Tiers':
                 self.session.query(Tiers).filter(Tiers.tierId == int(deleteid)).delete()
 
-            if table == 'Nodes':
+            elif table == 'Nodes':
                 self.session.query(Nodes).filter(Nodes.nodeId == int(deleteid)).delete()
 
-            if table == 'ServiceEndpoints':
+            elif table == 'ServiceEndpoints':
                 self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == int(deleteid)).delete()
 
-            if table == 'HealthViolations':
+            elif table == 'HealthViolations':
                 self.session.query(HealthViolations).filter(HealthViolations.violationId == int(deleteid)).delete()
-                # if table == 'ACItemp':
-                #     self.session.query(ACItemp).filter(appId=int(id)).delete()
-                # if table == 'ACIperm':
-                #     self.session.query(ACIperm).filter(appId=int(id)).delete()
-                # if table == 'Mapping':
-                #    self.session.query(Mapping).filter(Mapping.appId == int(deleteid)).delete()
-                # logger.info('Table Values deleted for - '+str(table))
+
+            # elif table == 'ACItemp':
+            #     self.session.query(ACItemp).filter(appId=int(id)).delete()
+            
+            # elif table == 'ACIperm':
+            #     self.session.query(ACIperm).filter(appId=int(id)).delete()
+            
+            # elif table == 'Mapping':
+            #    self.session.query(Mapping).filter(Mapping.appId == int(deleteid)).delete()
+            
+            logger.debug('Table Values deleted for - '+str(table))
+        
         except Exception as e:
             logger.exception('Exception Deleting values in table - ' + str(e))
             self.commitSession()
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for deleteEntry: " + str(end_time - start_time))
-
 
     def checkAndDelete(self, table, idList):
-        #start_time = datetime.datetime.now()
+        """This function deletes all the records except that in idList
+        
+        table : Name of the table
+        idList: IDs to keep in DB  
+        """
+        
         try:
             tabledata = self.returnValues(table)
         except Exception as e:
-            logger.exception('Exception Deleting values in table - ' + str(e))  # return "Nothing to delete"
+            logger.exception('Exception Deleting values in table - ' + str(e))
         if not tabledata:
             logger.info('Nothing to Delete')
-        if tabledata:
+        else:
             tableids = []
             if table == 'Application':
                 for each in tabledata: tableids.append(each.appId)
-            if table == 'Tiers':
+            elif table == 'Tiers':
                 for each in tabledata: tableids.append(each.tierId)
-            if table == 'Nodes':
+            elif table == 'Nodes':
                 for each in tabledata: tableids.append(each.nodeId)
-            if table == 'ServiceEndpoints':
+            elif table == 'ServiceEndpoints':
                 for each in tabledata: tableids.append(each.sepId)
-            if table == 'HealthViolations':
+            elif table == 'HealthViolations':
                 for each in tabledata: tableids.append(each.violationId)
             deleteList = list(set(tableids) - set(idList))
             logger.info('Delete for table:'+str(table)+', idlist: '+str(idList))
@@ -489,17 +468,12 @@ class Database():
             except Exception as e:
                 logger.exception('Exception in Check and Delete: ' + str(e))
                 self.commitSession()
-            #finally:
-                #end_time = datetime.datetime.now()
-                #logger.info("Time for checkAndDelete: " + str(end_time - start_time))
 
 
     def insertOrUpdate(self, table, key, data):
-        #start_time = datetime.datetime.now()
         try:
             if table == "EpgHistory":
                 recordExists = self.session.query(exists().where(EpgHistory.epgDn == key)).scalar()
-
                 if recordExists:
                     data_dict = {
                         "epgFaultRecords": data[0],
@@ -517,7 +491,6 @@ class Database():
 
             elif table == "EpgSummary":
                 recordExists = self.session.query(exists().where(EpgSummary.epgDn == key)).scalar()
-
                 if recordExists:
                     data_dict = {
                         "epgDomains": data[0],
@@ -538,9 +511,9 @@ class Database():
                     epgSummaryRecord = EpgSummary(epgDn = key, epgDomains = data[0], epgSubnets = data[1], epgStaticEps = data[2], epgStaticLeaves = data[3], epgFcPaths = data[4], 
                     epgStaticPorts = data[5], epgIfConns = data[6], epgContracts = data[7], epgLabels = data[8], timestamp = data[9])
                     self.session.add(epgSummaryRecord)
+
             elif table == "ApHistory":
                 recordExists = self.session.query(exists().where(ApHistory.apDn == key)).scalar()
-
                 if recordExists:
                     data_dict = {
                         "apFaultRecords": data[0],
@@ -555,9 +528,9 @@ class Database():
                     action = "Inserting"
                     epgHistoryRecord = ApHistory(apDn = key, apFaultRecords = data[0], apHealthRecords = data[1], apEventRecords = data[2], apLogRecords = data[3], timestamp = data[4])
                     self.session.add(epgHistoryRecord)
+
             elif table == "ApSummary":
                 recordExists = self.session.query(exists().where(ApSummary.apDn == key)).scalar()
-
                 if recordExists:
                     data_dict = {
                         "apEpgs": data[0],
@@ -570,9 +543,9 @@ class Database():
                     action = "Inserting"
                     apSummaryRecord = ApSummary(apDn = key, apEpgs = data[0], apUsegEpgs = data[1], timestamp = data[2])
                     self.session.add(apSummaryRecord)
+
             elif table == "HealthViolations":
                 recordExists = self.session.query(exists().where(HealthViolations.violationId == key)).scalar()
-
                 if recordExists:
                     data_dict = {
                         "startTime": data[0],
@@ -609,14 +582,11 @@ class Database():
         except Exception as ex:
             logger.exception('Exception while ' + action + ' Record in: \n Table : ' + table + "\n " + str(ex))
             self.commitSession()
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for insertOrUpdate: " + str(end_time - start_time))
 
 
+    # TODO: Refactor the function with use of WHERE clause.
     # Gets Data From Table and Updates or Inserts a record with given ID
     def checkIfExistsandUpdate(self, table, data):
-        #start_time = datetime.datetime.now()
         try:
             dataId = data[0]
             tableids = []
@@ -627,18 +597,19 @@ class Database():
             if tabledata:
                 if table == 'Mapping':
                     for each in tabledata: tableids.append(each.appId)
-                if table == 'Application':
+                elif table == 'Application':
                     for each in tabledata: tableids.append(each.appId)
-                if table == 'Tiers':
+                elif table == 'Tiers':
                     for each in tabledata: tableids.append(each.tierId)
-                if table == 'Nodes':
+                elif table == 'Nodes':
                     for each in tabledata: tableids.append(each.nodeId)
-                if table == 'ServiceEndpoints':
+                elif table == 'ServiceEndpoints':
                     for each in tabledata: tableids.append(each.sepId)
-                if table == 'HealthViolations':
+                elif table == 'HealthViolations':
                     for each in tabledata: tableids.append(each.violationId)
-                if table == 'ACItemp':
+                elif table == 'ACItemp':
                     for each in tabledata: tableids.append(each.dn)
+
             if tableids:
                 if dataId in tableids:
                     logger.info('Update table:' + str(table) + ' with Values:' + str(data))
@@ -646,23 +617,19 @@ class Database():
                 else:
                     logger.info('Insert into table:' + str(table) + ' with Values:' + str(data))
                     self.insertInto(table, data)
-                    # update
             else:
                 logger.info('Insert into table:' + str(table) + ' with Values:' + str(data))
                 self.insertInto(table, data)
-            # logger.info('Insert/Update executed for Table:'+str(table))
+
             self.commitSession()
         except Exception as e:
             logger.exception('Exception in Insert: ' + str(e))
             self.commitSession()
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for checkIfExistsandUpdate: " + str(end_time - start_time))
 
 
+    # TODO: check and update the return statements of all the below functions
     # Returns values from database based on query filers (IDs)
     def returnApplication(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
         try:
             if query_type == 'appId':
                 # query = self.session.query(Application).all()
@@ -676,13 +643,211 @@ class Database():
             return json.dumps({"payload": {}, "status_code": "300",
                                "message": "Internal backend error: could not return Application details. Error: " + str(
                                    e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnApplication: " + str(end_time - start_time))
+
+
+    def returnTiers(self, query_type, query_params):
+        try:
+            if query_type == 'tierId':
+                # query = self.session.query(Application).all()
+                return self.session.query(Tiers).filter(Tiers.tierId == query_params)
+            if query_type == 'tierName':
+                return self.session.query(Tiers).filter(Tiers.tierName == query_params)
+            if query_type == 'appId':
+                return self.session.query(Tiers).filter(Tiers.appId == query_params)
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not return Tier details. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not return Tier details. Error: " + str(e)})
+
+
+    def returnNodes(self, query_type, query_params):
+        try:
+            if query_type == 'nodeId':
+                # query = self.session.query(Application).all()
+                return self.session.query(Nodes).filter(Nodes.nodeId == query_params)
+            if query_type == 'nodeName':
+                return self.session.query(Nodes).filter(Nodes.nodeName == query_params)
+            if query_type == 'tierId':
+                return self.session.query(Nodes).filter(Nodes.tierId == query_params)
+            if query_type == 'appId':
+                return self.session.query(Nodes).filter(Nodes.appId == query_params)
+            if query_type == 'ipAddress':
+                return self.session.query(Nodes).filter(func.json_contains(Nodes.ipAddress, query_params) == 1).all()
+            if query_type == 'macAddress':
+                return self.session.query(Nodes).filter(func.json_contains(Nodes.macAddress, query_params) == 1).all()
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not return Node details. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not return Node details. Error: " + str(e)})
+
+
+    def returnServiceEndpoints(self, query_type, query_params):
+        try:
+            if query_type == 'tierId':
+                # query = self.session.query(Application).all()
+                return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.tierId == query_params)
+            if query_type == 'appId':
+                return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.appId == query_params)
+            if query_type == 'sepId':
+                return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == query_params)
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not return service endpoints. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not return service endpoints. Error: " + str(
+                                   e)})
+
+
+    def returnHealthViolations(self, query_type, query_params):
+        try:
+            if query_type == 'tierId':
+                # query = self.session.query(Application).all()
+                return self.session.query(HealthViolations).filter(HealthViolations.tierId == query_params)
+            if query_type == 'appId':
+                return self.session.query(HealthViolations).filter(HealthViolations.appId == query_params)
+            if query_type == 'violationId':
+                return self.session.query(HealthViolations).filter(HealthViolations.violationId == query_params)
+            if query_type == 'severity':
+                return self.session.query(HealthViolations).filter(HealthViolations.severity == query_params)
+            if query_type == 'startTime':
+                return self.session.query(HealthViolations).filter(HealthViolations.startTime == query_params)
+            if query_type == 'businessTransaction':
+                return self.session.query(HealthViolations).filter(HealthViolations.businessTransaction == query_params)
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not return Health violations. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not return Health violations. Error: " + str(
+                                   e)})
+
+
+    # Returns values from database based on query filers for ACI objects
+    def returnACItemp(self, query_type, query_params):
+        try:
+            if query_type == 'IP':
+                return self.session.query(ACItemp).filter(ACItemp.IP == query_params)
+            if query_type == 'dn':
+                return self.session.query(ACItemp).filter(ACItemp.dn == query_params)
+            if query_type == 'selector':
+                return self.session.query(ACItemp).filter(ACItemp.selector == query_params)
+            if query_type == 'appId':
+                return self.session.query(ACIperm).filter(ACIperm.appId == query_params)
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not return ACI objects. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not return ACI objects. Error: " + str(e)})
+
+
+    def returnACIperm(self, query_type, query_params):
+        try:
+            if query_type == 'IP':
+                return self.session.query(ACIperm).filter(ACIperm.IP == query_params)
+            if query_type == 'dn':
+                return self.session.query(ACIperm).filter(ACIperm.dn == query_params)
+            if query_type == 'appId':
+                return self.session.query(ACIperm).filter(ACIperm.appId == query_params)
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not return ACI objects. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not return ACI objects. Error: " + str(e)})
+
+    def storechangesinACItemp(self, data):
+        try:
+            self.session.query(ACItemp).filter(ACItemp.dn == data).update(
+                {'selector': 1})
+            self.commitSession()
+            return "Stored"
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not store data into databse. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not store data into databse. Error: " + str(
+                                   e)})
+
+
+    def getappList(self):
+        try:
+            appList = self.session.query(Application).all()
+            applicationList = []
+            for app in appList:
+                application = {'appId': app.appId, 'appName': str(app.appName),
+                               'appHealth': str(app.appMetrics['data'][0]['severitySummary']['performanceState']),
+                               'isViewEnabled': app.isViewEnabled}
+                applicationList.append(application)
+            self.commitSession()
+            return applicationList
+        except Exception as e:
+            self.flushSession()
+            logger.exception( "Internal backend error: could not retrieve Application list. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not retrieve Application list. Error: " + str(
+                                   e)})
+
+    
+    def getappbyId(self, id):
+        try:
+            app = self.session.query(Application).filter(Application.appId == id).first()
+            if app:
+                application = {'appId': app.appId, 'appName': str(app.appName),
+                               'appHealth': str(app.appMetrics['data'][0]['severitySummary']['performanceState']),
+                               'isViewEnabled': app.isViewEnabled}
+                return application
+            self.commitSession()
+        except Exception as e:
+            self.flushSession()
+
+        return None
+
+
+    def enableViewUpdate(self, appId, bool):
+        try:
+            self.session.query(Application).filter(Application.appId == appId).update(
+                {'isViewEnabled': bool})
+            return self.commitSession()
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Could not enable the view for application"+str(appId)+". Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view for application"+str(appId)+". Error: "+str(e)})
+
+
+    def saveMappings(self, appId, mapped_data):
+        try:
+            self.checkIfExistsandUpdate('Mapping', [appId, mapped_data])
+            return "Mapping Saved."
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not save mappings. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not save mappings. Error: " + str(e)})
+
+
+    def returnMapping(self, query_params):
+        try:
+            table_data = self.session.query(Mapping).filter(Mapping.appId == query_params)
+            for first in table_data:
+                return first.mapped_data
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not retrieve mappings. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not retrieve mappings. Error: " + str(e)})
+
+
+    def ipsforapp(self, appId):
+        try:
+            return self.returnNodes('appId', appId)
+        except Exception as e:
+            self.flushSession()
+            logger.exception("Internal backend error: could not retrieve nodes. Error: " + str(e))
+            return json.dumps({"payload": {}, "status_code": "300",
+                               "message": "Internal backend error: could not retrieve nodes. Error: " + str(e)})
 
 
     def returnFaults(self, dn):
-        #start_time = datetime.datetime.now()
         try:
             faults_list = []
             if "/epg-" in dn:
@@ -697,7 +862,7 @@ class Database():
                 "payload" : faults_list,
                 "status" : True,
                 "message" : ""
-            }              
+            }
         except Exception as ex:
             logger.exception("Internal backend error: could not return Fault details. Error: " + str(ex))
             return {
@@ -705,13 +870,9 @@ class Database():
                 "status": False,
                 "message": "Internal backend error: could not return Fault details. Error: " + str(ex)
             }
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnFaults: " + str(end_time - start_time))
 
 
     def returnEvents(self, dn):
-        #start_time = datetime.datetime.now()
         try:
             events_list = []
             if "/epg-" in dn:
@@ -734,13 +895,9 @@ class Database():
                 "status": False,
                 "message": "Internal backend error: could not return Event details. Error: " + str(ex)
             }
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnEvents: " + str(end_time - start_time))
 
 
     def returnAuditLogs(self, dn):
-        #start_time = datetime.datetime.now()
         try:
             audit_logs_list = []
             if "/epg-" in dn:
@@ -763,301 +920,3 @@ class Database():
                 "status": False,
                 "message": "Internal backend error: could not return Audit Log details. Error: " + str(ex)
             }
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnAuditLogs: " + str(end_time - start_time))
-
-
-    def returnTiers(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            if query_type == 'tierId':
-                # query = self.session.query(Application).all()
-                return self.session.query(Tiers).filter(Tiers.tierId == query_params)
-            if query_type == 'tierName':
-                return self.session.query(Tiers).filter(Tiers.tierName == query_params)
-            if query_type == 'appId':
-                return self.session.query(Tiers).filter(Tiers.appId == query_params)
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not return Tier details. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Tier details. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnTiers: " + str(end_time - start_time))
-
-
-    def returnNodes(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            if query_type == 'nodeId':
-                # query = self.session.query(Application).all()
-                return self.session.query(Nodes).filter(Nodes.nodeId == query_params)
-            if query_type == 'nodeName':
-                return self.session.query(Nodes).filter(Nodes.nodeName == query_params)
-            if query_type == 'tierId':
-                return self.session.query(Nodes).filter(Nodes.tierId == query_params)
-            if query_type == 'appId':
-                return self.session.query(Nodes).filter(Nodes.appId == query_params)
-            if query_type == 'ipAddress':
-                return self.session.query(Nodes).filter(func.json_contains(Nodes.ipAddress, query_params) == 1).all()
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not return Node details. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Node details. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnNodes: " + str(end_time - start_time))
-
-
-    def returnServiceEndpoints(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            if query_type == 'tierId':
-                # query = self.session.query(Application).all()
-                return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.tierId == query_params)
-            if query_type == 'appId':
-                return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.appId == query_params)
-            if query_type == 'sepId':
-                return self.session.query(ServiceEndpoints).filter(ServiceEndpoints.sepId == query_params)
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not return service endpoints. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return service endpoints. Error: " + str(
-                                   e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnServiceEndpoints: " + str(end_time - start_time))
-
-
-    def returnHealthViolations(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            if query_type == 'tierId':
-                # query = self.session.query(Application).all()
-                return self.session.query(HealthViolations).filter(HealthViolations.tierId == query_params)
-            if query_type == 'appId':
-                return self.session.query(HealthViolations).filter(HealthViolations.appId == query_params)
-            if query_type == 'violationId':
-                return self.session.query(HealthViolations).filter(HealthViolations.violationId == query_params)
-            if query_type == 'severity':
-                return self.session.query(HealthViolations).filter(HealthViolations.severity == query_params)
-            if query_type == 'startTime':
-                return self.session.query(HealthViolations).filter(HealthViolations.startTime == query_params)
-            if query_type == 'businessTransaction':
-                return self.session.query(HealthViolations).filter(HealthViolations.businessTransaction == query_params)
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not return Health violations. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Health violations. Error: " + str(
-                                   e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnHealthViolations: " + str(end_time - start_time))
-
-
-    # Returns values from database based on query filers for ACI objects
-    def returnACItemp(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            if query_type == 'IP':
-                return self.session.query(ACItemp).filter(ACItemp.IP == query_params)
-            if query_type == 'dn':
-                return self.session.query(ACItemp).filter(ACItemp.dn == query_params)
-            if query_type == 'selector':
-                return self.session.query(ACItemp).filter(ACItemp.selector == query_params)
-            if query_type == 'appId':
-                return self.session.query(ACIperm).filter(ACIperm.appId == query_params)
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not return ACI objects. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return ACI objects. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnACItemp: " + str(end_time - start_time))
-
-
-    def returnACIperm(self, query_type, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            if query_type == 'IP':
-                return self.session.query(ACIperm).filter(ACIperm.IP == query_params)
-            if query_type == 'dn':
-                return self.session.query(ACIperm).filter(ACIperm.dn == query_params)
-            if query_type == 'appId':
-                return self.session.query(ACIperm).filter(ACIperm.appId == query_params)
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not return ACI objects. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return ACI objects. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnACIperm: " + str(end_time - start_time))
-
-    def storechangesinACItemp(self, data):
-        #start_time = datetime.datetime.now()
-        try:
-            self.session.query(ACItemp).filter(ACItemp.dn == data).update(
-                {'selector': 1})
-            self.commitSession()
-            return "Stored"
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not store data into databse. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not store data into databse. Error: " + str(
-                                   e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for storechangesinACItemp: " + str(end_time - start_time))
-
-
-    def getappList(self):
-        #start_time = datetime.datetime.now()
-        try:
-            appList = self.session.query(Application).all()
-            applicationList = []
-            for app in appList:
-                application = {'appId': app.appId, 'appName': str(app.appName),
-                               'appHealth': str(app.appMetrics['data'][0]['severitySummary']['performanceState']),
-                               'isViewEnabled': app.isViewEnabled}
-                applicationList.append(application)
-            self.commitSession()
-            return applicationList
-        except Exception as e:
-            self.flushSession()
-            logger.exception( "Internal backend error: could not retrieve Application list. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not retrieve Application list. Error: " + str(
-                                   e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for getappList: " + str(end_time - start_time))
-
-
-    def enableViewUpdate(self, appId, bool):
-        #start_time = datetime.datetime.now()
-        try:
-            self.session.query(Application).filter(Application.appId == appId).update(
-                {'isViewEnabled': bool})
-            return self.commitSession()
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Could not enable the view for application"+str(appId)+". Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view for application"+str(appId)+". Error: "+str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for enableViewUpdate: " + str(end_time - start_time))
-
-
-    def saveMappings(self, appId, mapped_data):
-        #start_time = datetime.datetime.now()
-        try:
-            self.checkIfExistsandUpdate('Mapping', [appId, mapped_data])
-            return "Mapping Saved."
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not save mappings. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not save mappings. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for saveMappings: " + str(end_time - start_time))
-
-
-    def returnMapping(self, query_params):
-        #start_time = datetime.datetime.now()
-        try:
-            table_data = self.session.query(Mapping).filter(Mapping.appId == query_params)
-            for first in table_data:
-                return first.mapped_data
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not retrieve mappings. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not retrieve mappings. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for returnMapping: " + str(end_time - start_time))
-
-
-    def ipsforapp(self, appId):
-        #start_time = datetime.datetime.now()
-        try:
-            return self.returnNodes('appId', appId)
-        except Exception as e:
-            self.flushSession()
-            logger.exception("Internal backend error: could not retrieve nodes. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not retrieve nodes. Error: " + str(e)})
-        #finally:
-            #end_time = datetime.datetime.now()
-            #logger.info("Time for ipsforapp: " + str(end_time - start_time))
-
-
-# ======= MAIN ========
-# databaseObject = Database()
-# databaseObject.createTables()
-# x= databaseObject.returnServiceEndpoints('tierId',8)
-# print x
-# for each in x:
-#     print type(each.sep)
-#     if isinstance(each.sep,dict):
-#         print True
-#     else:
-#         print each.sep
-# x = databaseObject.returnHealthViolations('tierId',8)
-# print x
-# for each in x:
-#     print type(x.violationId)
-# tiers = databaseObject.returnValues('Tiers')
-# for each in tiers:
-#     print each.tierId
-
-# print databaseObject.returnValues('Application')
-# x= databaseObject.returnValues('Nodes')
-# for each in x:
-#     print x.nodeId
-# for each in databaseObject.returnValues('Mapping'):
-#     print(str(each.appId))
-#     print(str(each.mapped_data))
-
-#
-# for appid in range(0,4):
-#     (databaseObject.insertInto('Application', [appid, 'App1', {'m1': 'v1', 'm2': 'v2'}]))
-# databaseObject.commitSession()
-#
-# print "============"
-# time.sleep(5)
-# vals = databaseObject.returnValues('ACItemp')
-#
-# for each in vals:
-#     print str(each.dn) + "  /  " + str(each.IP)
-#     print each.tenant
-#     print each.appId
-#     print each.selector
-#
-# time.sleep(3)
-#
-# databaseObject.checkIfExistsandUpdate('Application',[1, 'App1', {'m1': 'v1', 'm2': 'v2'}])
-# databaseObject.getappList()
-# databaseObject.checkIfExistsandUpdate('Map', [5, [{'IP': '10.10.10.20', 'dn': 'uni/tn-appd/ap-ap1/epg-epg1'},
-#                                               {'IP': '10.10.10.15', 'dn': 'uni/tn-appd/ap-ap2/epg-epg2'}]])
-# x = databaseObject.returnMapping(8)
-# print x
-# for each in x:
-#     print each.appId
-#     print each.mapped_data
-# for each in databaseObject.ipsforapp(5):
-#     print each.ipAddress
-# mapped_data = [{'ipaddress':'20.20.20.12','domains': [{'domainName': 'uni/tn-AppDynamics/ap-AppD-AP1-EcommerceApp/epg-AppD-Ecomm',
-#                'recommended': False}]}, {'ipaddress':'20.20.20.11','domains': [{'domainName': 'uni/tn-AppDynamics/ap-AppD-AP1-EcommerceApp/epg-AppD-Pay',
-#                'recommended': False}]}]
-# appId = 8
-# databaseObject.saveMappings(appId,mapped_data)

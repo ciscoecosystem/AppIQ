@@ -313,6 +313,27 @@ class AppD(object):
             logger.info("Time for get_service_endpoints: " + str(end_time - start_time))
 
 
+    def get_node_mac(self, node_id):
+        """
+        Return mac addresses as array for given node Id.
+        """
+        mac = []
+        try:
+            self.check_connection()
+            # Non documented API call to fetch mac for given node
+            node_mac_details_response = self.appd_session.get(
+                str(self.host)+':'+ self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
+                    node_id) + '&output=JSON', auth=(self.user, self.password))
+            if node_mac_details_response.status_code == 200:
+                logger.info('Fetched mac for Nodes ' + str(node_id))
+                if node_mac_details_response.json():
+                    for all_data in node_mac_details_response.json():
+                        for interface in all_data.get('networkInterfaces'):
+                            mac.append(str(interface['macAddress']))
+        except Exception as e:
+            logger.exception("error occured while getting mac for node : "+str(e))
+        return mac
+
     def get_app_info(self):
         start_time = datetime.datetime.now()
         try:
@@ -434,7 +455,6 @@ class AppD(object):
                                                                              'jsessionid': self.JSessionId,
                                                                              'content-type': 'application/json'},
                                                        data=json.dumps(payload))
-            # logger.info('HEV code -'+str(health_violations.status_code))
             if tier_id and str(health_violations.status_code) != "200":
                 self.check_connection()
                 try:
@@ -442,7 +462,6 @@ class AppD(object):
                                                                                      'jsessionid': self.JSessionId,
                                                                                      'content-type': 'application/json'},
                                                                data=json.dumps(payload))
-                    # logger.info('HEV code -'+str(health_violations.status_code))
                 except Exception as e:
                     logger.exception('HEV API call failed,  ' + str(e))
                     return []
@@ -451,7 +470,6 @@ class AppD(object):
                 if not health_violations:
                     return []
                 
-                #logger.info("=====health_violations======" + str(health_violations))
                 if 'entityMap' in health_violations:
                     for key1, val1 in health_violations.get('entityMap').iteritems():
                         key = str(key1).split(',')
@@ -873,17 +891,19 @@ class AppD(object):
                                     if tier.get('numberOfNodes') > 0:
                                         nodes = self.get_node_info(app.get('id'), tier.get('id'))
                                         ipList = []
-                                        #logger.info('Nodes for tier'+str(tier.get('id'))+', app:'+str(app.get('id')))
+                                        macList = []
                                         #logger.info(nodes)
                                         if len(nodes) > 0:
                                             for node in nodes:
                                                 node_health = self.get_node_health(node.get('id'))
                                                 if node_health != 'UNDEFINED':
                                                     #logger.info('Node health:' + str(node_health))
-                                                    #continue
-                                                        
-                                                    if 'ipAddresses' in node:
 
+                                                    # get mac-address for node
+                                                    macList = self.get_node_mac(node.get('id'))
+                                                    logger.info("mac list::"+str(macList)+" for node "+str(node.get("id")))
+                                                    # get ip-address for node
+                                                    if 'ipAddresses' in node:
                                                         # If 'ipAddresses' key is None, we make another API Call to get the Node Details
                                                         if not node.get('ipAddresses'):
                                                             node_details = self.get_node_details(app.get('id'), node.get('id'))                                                            
@@ -902,25 +922,27 @@ class AppD(object):
                                                                 else:
                                                                     ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
                                                                     ipList.append(str(ipv4))
-                                                            self.databaseObject.checkIfExistsandUpdate('Nodes',
-                                                                                                       [node.get('id'),
-                                                                                                        str(node.get('name')),
-                                                                                                        tier.get('id'),
-                                                                                                        str(node_health),
-                                                                                                        ipList, app.get('id'), timeStamp])
-                                                            nodeidlist.append(node.get('id'))
-                                                            ipList = []
-                                                            logger.info(
-                                                                'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
-                                                                    app.get('name')) + ', Tier - ' + str(
-                                                                    tier.get('id')) + ', Node - ' + str(node.get('id')))
+
+                                                    self.databaseObject.checkIfExistsandUpdate('Nodes',
+                                                                                                [node.get('id'),
+                                                                                                str(node.get('name')),
+                                                                                                tier.get('id'),
+                                                                                                str(node_health),
+                                                                                                ipList, app.get('id'), timeStamp, macList])
+                                                    nodeidlist.append(node.get('id'))
+                                                    logger.info(
+                                                        'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
+                                                            app.get('name')) + ', Tier - ' + str(
+                                                            tier.get('id')) + ', Node - ' + str(node.get('id')))
                                                         
                     self.databaseObject.checkAndDelete('Application', appidList)
                     self.databaseObject.checkAndDelete('Tiers', tieridList)
                     self.databaseObject.checkAndDelete('ServiceEndpoints', sepList)
                     self.databaseObject.checkAndDelete('HealthViolations', violationList)
                     self.databaseObject.checkAndDelete('Nodes', nodeidlist)
-                    
+
+                    self.databaseObject.commitSession()
+
                     aci_local_object = aci_local.ACI_Local("")
 
                     self.check_and_wait_till_locked()
