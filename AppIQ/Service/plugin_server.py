@@ -1000,7 +1000,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                                     else:
                                         merged_epg_count[aci['EPG']].append(aci[aci_key])
         for aci in aci_data:
-            if aci['IP'] not in merged_eps or aci['CEP-Mac'] not in merged_eps:
+            if aci['IP'] not in merged_eps and aci['CEP-Mac'] not in merged_eps:
                 if aci['EPG'] not in non_merged_ep_dict:
                     non_merged_ep_dict[aci['EPG']] = {aci['CEP-Mac']: str(aci['IP'])}
                 else:
