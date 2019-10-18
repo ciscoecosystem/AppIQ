@@ -257,9 +257,29 @@ def apps(tenant):
         end_time =  datetime.datetime.now()
         logger.info("Time for APPS: " + str(end_time - start_time))
 
+def getMappingDictTargetCluster(mapped_objects):
+    """
+    return mapping dict from recommended objects
+    """
+    target = []
+    for map_object in mapped_objects:
+        for entry in map_object.get('domains'):
+            if entry.get('recommended') == True:
+                if 'ipaddress' in map_object:
+                    logger.debug("Mapping found with ipaddress for "+str(map_object))
+                    target.append({'domainName': entry.get('domainName'), 'ipaddress': map_object.get('ipaddress'), 'disabled': False})
+                elif 'macaddress' in map_object:
+                    logger.debug("Mapping found with macaddress for "+str(map_object))
+                    target.append({'domainName': entry.get('domainName'), 'macaddress': map_object.get('macaddress'), 'disabled': False})
+    return target
 
 @app.route('/mapping.json', methods=['GET'])
 def mapping(tenant, appDId):
+    """
+    Create mapping dict to display on UI at mapping tab. 
+    Source will display at left on UI.
+    Traget will display at Right on UI.
+    """
     start_time = datetime.datetime.now()
     try:
         appId = str(appDId) + str(tenant)
@@ -268,7 +288,7 @@ def mapping(tenant, appDId):
         # returns the mapping from Mapping Table
         already_mapped_data = database_object.returnMapping(appId)
         rec_object = Recommend.Recommend()
-        mapped_objects = rec_object.correlate_aci_appd(tenant, appDId)
+        mapped_objects = rec_object.correlate_aci_appd(tenant, appDId)        
 
         if not mapped_objects:
             logger.info('Empty Mapping dict for appDId:'+str(appDId))
@@ -277,7 +297,39 @@ def mapping(tenant, appDId):
 
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
-            mapping_dict['target_cluster'] = already_mapped_data
+
+            # Get new mapping based on recommendation which may have new nodes
+            current_mapping = getMappingDictTargetCluster(mapped_objects)
+            new_nodes = []
+            is_mapping_changed = False
+            for new_map in current_mapping:
+                found = False
+                for existing_map in already_mapped_data:
+                    key_1 = 'ipaddress'
+                    key_2 = 'ipaddress'
+                    if 'ipaddress' not in existing_map:
+                        key_1 = 'macaddress'
+                    if 'ipaddress' not in new_map:
+                        key_2 = 'macaddress'
+
+                    # Find node which is same as based on recommendation
+                    if existing_map.get(key_1) == new_map.get(key_2) and existing_map.get('domainName') == new_map.get('domainName'):
+                        # If disabled node found in recommended and saved mapping then it should be disabled
+                        if existing_map.get('disabled') == True:
+                            is_mapping_changed = True
+                            new_map['disabled'] = True
+                        found = True
+                        break
+                # If node not found in existing mapping, maintain it in different list
+                if not found:
+                    new_nodes.append(new_map)  
+
+            if len(new_nodes) > 0 or is_mapping_changed:
+                # If new node found, generate new mapping and save it in DB
+                database_object.checkIfExistsandUpdate('Mapping', [appId, current_mapping])
+                mapping_dict['target_cluster'] = [node for node in current_mapping if node.get('disabled') == False]
+            else:
+                mapping_dict['target_cluster'] = [node for node in already_mapped_data if node.get('disabled') == False]
         else:
             logger.info("Mapping Empty!")
             app_list = database_object.getappList()
@@ -286,18 +338,9 @@ def mapping(tenant, appDId):
             # TODO: Why not get the App with given AppId from DB?? with a where claws
             for app in app_list:
                 if app.get('appId') == appDId and app.get('isViewEnabled') == True:
-                    target = []
-                    for map_object in mapped_objects:
-                        for entry in map_object['domains']:
-                            if entry.get('recommended') == True:
-                                if 'ipaddress' in map_object:
-                                    logger.debug("Mapping found with ipaddress for "+str(map_object))
-                                    target.append({'domainName': entry.get('domainName'), 'ipaddress': map_object.get('ipaddress')})
-                                elif 'macaddress' in map_object:
-                                    logger.debug("Mapping found with macaddress for "+str(map_object))
-                                    target.append({'domainName': entry.get('domainName'), 'macaddress': map_object.get('macaddress')})
-                        mapping_dict['target_cluster'] = target
-                    
+                    target = getMappingDictTargetCluster(mapped_objects)
+                    mapping_dict['target_cluster'] = target
+                                       
                     # Put mapping in DB
                     database_object.checkIfExistsandUpdate('Mapping', [appId, target])
                     
@@ -318,6 +361,27 @@ def mapping(tenant, appDId):
         end_time =  datetime.datetime.now()
         logger.info("Time for MAPPING: " + str(end_time - start_time))
 
+def parseMappingBeforeSave(already_mapped_data, data_list):
+    """
+    Set disabled value true if user has disabled particular node manually.
+    """
+    for previous_mapping in already_mapped_data:
+        is_node_exist = False
+        for current_mapping in data_list:
+            key = 'ipaddress'
+            if 'ipaddress' not in current_mapping:
+                key = 'macaddress'
+            if current_mapping.get(key) == previous_mapping.get(key) and current_mapping.get('domainName') == previous_mapping.get('domainName'):
+                is_node_exist = True
+                break
+        
+        # Append removed node by user as disabled 
+        if not is_node_exist:
+            previous_mapping['disabled'] = True
+            data_list.append(previous_mapping)
+
+    return data_list
+            
 
 @app.route('/saveMapping.json', methods=['POST'])
 def saveMapping(appDId, tenant, mappedData):
@@ -329,20 +393,22 @@ def saveMapping(appDId, tenant, mappedData):
             (str(mappedData).strip("'<>() ").replace('\'', '\"')))  # new implementation for GraphQL
         data_list = []
 
+        already_mapped_data = database_object.returnMapping(appId)
         for mapping in mappedData_dict:
             if mapping.get('ipaddress') != "":
-                data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domains'][0]['domainName']})
+                data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domains'][0]['domainName'], 'disabled': False})
             elif mapping.get('macaddress') != "":
-                data_list.append({'macaddress': mapping['macaddress'], 'domainName': mapping['domains'][0]['domainName']})
+                data_list.append({'macaddress': mapping['macaddress'], 'domainName': mapping['domains'][0]['domainName'], 'disabled': False})
+
         if not data_list:
             database_object.deleteEntry('Mapping', appId)
             #enableView(appDId, False)
-            return json.dumps({"payload": "Saved Mappings", "status_code": "200", "message": "OK"})
         else:
+            data_list = parseMappingBeforeSave(already_mapped_data, data_list)
             database_object.deleteEntry('Mapping', appId)
             database_object.checkIfExistsandUpdate('Mapping', [appId, data_list])
             enableView(appDId, True)
-            return json.dumps({"payload": "Saved Mappings", "status_code": "200", "message": "OK"})
+        return json.dumps({"payload": "Saved Mappings", "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not save mappings to the database. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not save mappings to the database. Error: "+str(e)})
@@ -965,6 +1031,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
 
         appId = str(appDId) + str(tenant)
         mappings = database_object.returnMapping(appId)
+        mappings = [node for node in mappings if node.get('disabled') == False]
 
         logger.debug("ACI Data: {}".format(str(aci_data)))
         logger.debug("Mapping Data: {}".format(str(mappings)))
