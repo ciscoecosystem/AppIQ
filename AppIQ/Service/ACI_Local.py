@@ -340,10 +340,16 @@ class ACI_Local(object):
                 #logger.info('EP Name:'+str(ep['fvCEp']['attributes']['name']))
                 ep_attr = ep['fvCEp']['attributes']
                 fviplist = []
+                is_ip_list = False
                 for eachip in ep['fvCEp']['children']:
                     if eachip.keys()[0] == 'fvIp':
+                        is_ip_list = True
                         fviplist.append(str(eachip['fvIp']['attributes']['addr']))
                 #print fviplist
+
+                if not is_ip_list:
+                    fviplist.append(str(ep['fvCEp']['attributes']['mac']))
+                    
                 for ip in fviplist:
                     
                     # ep_dict = {'Tenant': '', "AppProfile": '', 'EPG': '', 'CEP-Mac': '', 'IP': ''}
@@ -363,7 +369,8 @@ class ACI_Local(object):
                     ep_dict.update({'Contracts': ct_data_list})
                     ep_dict.update({'BD': str(bd_data)})
                     splitString = string.split("/")
-                    ep_dict.update({"IP": str(ip)})
+                    if is_ip_list:
+                        ep_dict.update({"IP": str(ip)})
                     for eachSplit in splitString:
                         if "-" in eachSplit:
                             epSplit = eachSplit.split("-", 1)
