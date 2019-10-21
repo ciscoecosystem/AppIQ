@@ -346,7 +346,10 @@ class ACI_Local(object):
                         is_ip_list = True
                         fviplist.append(str(eachip['fvIp']['attributes']['addr']))
                 #print fviplist
-                fviplist.append(str(ep['fvCEp']['attributes']['mac']))
+
+                if not is_ip_list:
+                    fviplist.append(str(ep['fvCEp']['attributes']['mac']))
+                    
                 for ip in fviplist:
                     
                     # ep_dict = {'Tenant': '', "AppProfile": '', 'EPG': '', 'CEP-Mac': '', 'IP': ''}
