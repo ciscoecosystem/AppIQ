@@ -500,33 +500,52 @@ class ACI_Local(object):
             logger.info("Time for ACI MAIN: " + str(end_time - start_time))
 
 
-# ==============================================================================================================================
-#         # cookies = {}
-#         # cookies['APIC-Cookie'] = auth_token
-#     # uses REST API to subscribe to tenants
-#         tenant_url = 'https://' + self.apic_ip + '/api//class/fvCEp.json?query-target-filter=wcard(fvCEp.dn,"' + str(
-#         self.tenant) + '")'
-#         tenant_response = requests.get(tenant_url, cookies=cookies, verify=False)
-#         ep_resp = json.loads(tenant_response.text)['imdata']
-#         ep_list = []
-#         for ep in ep_resp:
-#             ep_attr = ep['fvCEp']['attributes']
-#             # ep_dict = {'Tenant': '', "AppProfile": '', 'EPG': '', 'CEP-Mac': '', 'IP': ''}
-#             ep_dict = {"AppProfile": '', 'EPG': '', 'CEP-Mac': '', 'IP': ''}
-#             string = str(ep_attr['dn'])
-#             splitString = string.split("/")
-#             for eachSplit in splitString:
-#                 if "-" in eachSplit:
-#                     epSplit = eachSplit.split("-", 1)
-#                     # if epSplit[0] == "tn":
-#                     #     ep_dict.update({"Tenant": str(epSplit[1])})
-#                     if epSplit[0] == "ap":
-#                         ep_dict.update({"AppProfile": str(epSplit[1])})
-#                     if epSplit[0] == "epg":
-#                         ep_dict.update({"EPG": str(epSplit[1])})
-#                     if epSplit[0] == "cep":
-#                         ep_dict.update({"CEP-Mac": str(epSplit[1])})
-#             ep_dict.update({'IP': str(ep_attr['ip'])})
-#             ep_list.append(ep_dict)
-#         return ep_list
-#
+    def get_dict_records(self, list_of_records, key):
+        records_dict = dict()
+        records_dict[key] = list_of_records
+        return records_dict
+
+
+    def get_ap_epg_audit_logs(self, timeStamp, dn):
+        start_time = datetime.datetime.now()
+        try:
+            audit_logs_query_string = "rsp-subtree-include=audit-logs,no-scoped,subtree"
+            audit_logs_list = self.get_mo_related_item(dn, audit_logs_query_string, "")
+            audit_logs_dict = self.get_dict_records(audit_logs_list, "auditLogRecords")
+
+            return audit_logs_dict
+        except Exception as ex:
+            logger.info("Exception while processing Audit logs : " + str(ex))
+        finally:
+            end_time =  datetime.datetime.now()
+            logger.info("Time taken for get_ap_epg_audit_logs: " + str(end_time - start_time))
+
+
+    def get_ap_epg_events(self, timeStamp, dn):
+        start_time = datetime.datetime.now()
+        try:
+            events_query_string = "rsp-subtree-include=event-logs,no-scoped,subtree"
+            events_list = self.get_mo_related_item(dn, events_query_string, "")
+            events_dict = self.get_dict_records(events_list, "eventRecords")
+
+            return events_dict
+        except Exception as ex:
+            logger.info("Exception while processing Events : " + str(ex))
+        finally:
+            end_time =  datetime.datetime.now()
+            logger.info("Time taken for get_ap_epg_events: " + str(end_time - start_time))
+
+
+    def get_ap_epg_faults(self, timeStamp, dn):
+        start_time = datetime.datetime.now()
+        try:
+            fault_query_string = "rsp-subtree-include=fault-records,no-scoped,subtree"
+            faults_list = self.get_mo_related_item(dn, fault_query_string, "")
+            faults_dict = self.get_dict_records(faults_list, "faultRecords")
+
+            return faults_dict
+        except Exception as ex:
+            logger.info("Exception while processing Faults : " + str(ex))
+        finally:
+            end_time =  datetime.datetime.now()
+            logger.info("Time taken for get_ap_epg_faults: " + str(end_time - start_time))

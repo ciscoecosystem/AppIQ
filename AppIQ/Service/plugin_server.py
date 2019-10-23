@@ -421,7 +421,11 @@ def getFaults(dn):
     """
     Get List of Faults related to the given MO from Database
     """
-    faults_resp = database_object.returnFaults(dn)
+
+    start_time = datetime.datetime.utcnow()
+    aci_local_object = aci_local.ACI_Local("")
+    faults_resp = aci_local_object.get_ap_epg_faults(start_time, dn)
+
     if faults_resp["status"]:
         faults_list = faults_resp["payload"]
         faults_payload = []
@@ -452,7 +456,11 @@ def getEvents(dn):
     """
     Get List of Events related to the given MO from Database
     """
-    events_resp = database_object.returnEvents(dn)
+
+    start_time = datetime.datetime.utcnow()
+    aci_local_object = aci_local.ACI_Local("")
+    events_resp = aci_local_object.get_ap_epg_events(start_time, dn)
+
     if events_resp["status"]:
         events_list = events_resp["payload"]
         events_payload = []
@@ -484,7 +492,11 @@ def getAuditLogs(dn):
     """
     Get List of Audit Log Records related to the given MO from Database
     """
-    audit_logs_resp = database_object.returnAuditLogs(dn)
+
+    start_time = datetime.datetime.utcnow()
+    aci_local_object = aci_local.ACI_Local("")
+    audit_logs_resp = aci_local_object.get_ap_epg_audit_logs(start_time, dn)
+
     if audit_logs_resp["status"]:
         audit_logs_list = audit_logs_resp["payload"]
         audit_logs_payload = []
