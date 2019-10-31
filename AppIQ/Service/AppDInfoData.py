@@ -641,7 +641,6 @@ class AppD(object):
             self.check_connection()
             logger.info('===Starting Database Update!')
             
-            
             try:
                 apps = self.get_app_info()
                 logger.info('Total apps found in the DB:' + str(len(apps)))

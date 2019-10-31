@@ -507,45 +507,54 @@ class ACI_Local(object):
 
 
     def get_ap_epg_audit_logs(self, timeStamp, dn):
+        """
+        Get Audit logs from rest API.
+        """
         start_time = datetime.datetime.now()
+        audit_logs_dict = None
         try:
             audit_logs_query_string = "rsp-subtree-include=audit-logs,no-scoped,subtree"
             audit_logs_list = self.get_mo_related_item(dn, audit_logs_query_string, "")
             audit_logs_dict = self.get_dict_records(audit_logs_list, "auditLogRecords")
-
-            return audit_logs_dict
         except Exception as ex:
             logger.info("Exception while processing Audit logs : " + str(ex))
         finally:
             end_time =  datetime.datetime.now()
             logger.info("Time taken for get_ap_epg_audit_logs: " + str(end_time - start_time))
+        return audit_logs_dict
 
 
     def get_ap_epg_events(self, timeStamp, dn):
+        """
+        Get Events from rest API.
+        """
         start_time = datetime.datetime.now()
+        events_dict = None
         try:
             events_query_string = "rsp-subtree-include=event-logs,no-scoped,subtree"
             events_list = self.get_mo_related_item(dn, events_query_string, "")
             events_dict = self.get_dict_records(events_list, "eventRecords")
-
-            return events_dict
         except Exception as ex:
             logger.info("Exception while processing Events : " + str(ex))
         finally:
             end_time =  datetime.datetime.now()
             logger.info("Time taken for get_ap_epg_events: " + str(end_time - start_time))
+        return events_dict
 
 
     def get_ap_epg_faults(self, timeStamp, dn):
+        """
+        Get Faults from rest API.
+        """
         start_time = datetime.datetime.now()
+        faults_dict = None
         try:
             fault_query_string = "rsp-subtree-include=fault-records,no-scoped,subtree"
             faults_list = self.get_mo_related_item(dn, fault_query_string, "")
             faults_dict = self.get_dict_records(faults_list, "faultRecords")
-
-            return faults_dict
         except Exception as ex:
             logger.info("Exception while processing Faults : " + str(ex))
         finally:
             end_time =  datetime.datetime.now()
             logger.info("Time taken for get_ap_epg_faults: " + str(end_time - start_time))
+        return faults_dict
