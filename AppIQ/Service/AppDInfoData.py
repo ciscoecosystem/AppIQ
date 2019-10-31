@@ -591,179 +591,6 @@ class AppD(object):
         return records_dict
 
 
-    def get_epg_history(self, timeStamp, aci_local_object):
-        start_time = datetime.datetime.now()
-        try:
-            self.check_and_wait_till_locked()
-            # aci_local_object = aci_local.ACI_Local("")
-
-            self.check_and_wait_till_locked()
-            epg_resp = aci_local_object.get_all_mo_instances("fvAEPg")
-
-            if (epg_resp["status"]):
-                epg_list = epg_resp["payload"]
-                if (epg_list):
-                    for epg in epg_list:
-                        epg_dn = epg["fvAEPg"]["attributes"]["dn"]
-                        
-                        self.check_and_wait_till_locked()
-                        fault_query_string = "rsp-subtree-include=fault-records,no-scoped,subtree"
-                        faults_list = aci_local_object.get_mo_related_item(epg_dn, fault_query_string, "")
-                        faults_dict = self.get_dict_records(faults_list, "faultRecords")
-                        
-                        self.check_and_wait_till_locked()
-                        events_query_string = "rsp-subtree-include=event-logs,no-scoped,subtree"
-                        events_list = aci_local_object.get_mo_related_item(epg_dn, events_query_string, "")
-                        events_dict = self.get_dict_records(events_list, "eventRecords")
-
-                        self.check_and_wait_till_locked()
-                        audit_logs_query_string = "rsp-subtree-include=audit-logs,no-scoped,subtree"
-                        audit_logs_list = aci_local_object.get_mo_related_item(epg_dn, audit_logs_query_string, "")
-                        audit_logs_dict = self.get_dict_records(audit_logs_list, "auditLogRecords")
-
-                        self.check_and_wait_till_locked()
-                        health_records = aci_local_object.get_mo_related_item(epg_dn, "", "HealthRecords")
-                        health_records_dict = self.get_dict_records(health_records, "healthRecords")
-
-                        epgHistoryData = [faults_dict, health_records_dict, events_dict, audit_logs_dict, timeStamp]
-                        
-                        self.databaseObject.insertOrUpdate("EpgHistory", epg_dn, epgHistoryData)
-                        # self.get_epg_summary(epg_dn, timeStamp)
-
-                else:
-                    logger.warning("EPgs not found")
-        except Exception as ex:
-            logger.exception("Exception while processing Epg History : " + str(ex))
-        finally:
-            end_time =  datetime.datetime.now()
-            logger.info("Time for get_epg_history: " + str(end_time - start_time))
-    
-    
-    def get_epg_summary(self, epg_dn, timeStamp, aci_local_object):
-        start_time = datetime.datetime.now()
-        try:
-            # aci_local_object = aci_local.ACI_Local("")
-            
-            domains_dict = {"domainRecords" : []}
-            subnets_dict = {"subnetRecords" : []}
-            static_eps_dict = {"staticEpRecords": []}
-            static_leaves_dict = {"staticLeafRecords" : []}
-            fc_path_dict = {"fcPathRecords" : []}
-            static_ports_dict = {"staticPortRecords" : []}
-
-            multiple_obj_query_string = "query-target=children&target-subtree-class=fvRsDomAtt,fvSubnet,fvStCEp,fvRsNodeAtt,fvRsFcPathAtt,fvRsPathAtt"
-            multiple_objs_list = aci_local_object.get_mo_related_item(epg_dn, multiple_obj_query_string, "")
-            
-            contracts_query_string = "query-target=subtree&target-subtree-class=fvRsCons&target-subtree-class=fvRsConsIf,fvRsProtBy,fvRsProv,vzConsSubjLbl,vzProvSubjLbl,vzConsLbl,vzProvLbl,fvRsIntraEpg"
-            contracts_list = aci_local_object.get_mo_related_item(epg_dn, contracts_query_string, "")
-            contracts_dict = self.get_dict_records(contracts_list, "contractRecords")
-
-            epg_labels_query_string = "query-target=children&target-subtree-class=fvCEp&rsp-subtree=children&rsp-subtree-class=fvRsToVm,fvRsVm,fvRsHyper,fvRsCEpToPathEp,fvIp,fvPrimaryEncap"
-            epg_labels_list = aci_local_object.get_mo_related_item(epg_dn, epg_labels_query_string, "")
-            epg_labels_dict = self.get_dict_records(epg_labels_list, "epgLabelRecords")
-
-            if_conn_query_string = "query-target=subtree&target-subtree-class=fvIfConn"
-            if_conn_list = aci_local_object.get_mo_related_item(epg_dn, if_conn_query_string, "ifConnRecords")
-            if_conn_dict = self.get_dict_records(if_conn_list, "ifaceConnRecords")
-
-            for obj in multiple_objs_list:
-                for key in obj:
-                    if key == "fvRsDomAtt":
-                        domains_dict["domainRecords"].append(obj)
-                    elif key == "fvSubnet":
-                        subnets_dict["subnetRecords"].append(obj)
-                    elif key == "fvStCEp":
-                        static_eps_dict["staticEpRecords"].append(obj)
-                    elif key == "fvRsNodeAtt":
-                        static_leaves_dict["staticLeafRecords"].append(obj)
-                    elif key == "fvRsFcPathAtt":
-                        fc_path_dict["fcPathRecords"].append(obj)
-                    elif key == "fvRsPathAtt":
-                        static_ports_dict["staticPortRecords"].append(obj)
-
-            epgSummaryData = [domains_dict, subnets_dict, static_eps_dict, static_leaves_dict, fc_path_dict, static_ports_dict, if_conn_dict, contracts_dict, epg_labels_dict, timeStamp]
-            
-            self.databaseObject.insertOrUpdate("EpgSummary", epg_dn, epgSummaryData)
-            
-        except Exception as ex:
-            logger.exception("Exception while processing Epg Summary : " + str(ex))
-        finally:
-            end_time =  datetime.datetime.now()
-            logger.info("Time for get_epg_summary: " + str(end_time - start_time))
-    
-
-    def get_ap_history(self, timeStamp, aci_local_object):
-        start_time = datetime.datetime.now()
-        try:
-            self.check_and_wait_till_locked()
-            # aci_local_object = aci_local.ACI_Local("")
-
-            self.check_and_wait_till_locked()
-            ap_resp = aci_local_object.get_all_mo_instances("fvAp")
-            
-            if (ap_resp["status"]):
-                ap_list = ap_resp["payload"]
-                if (ap_list):
-                    for ap in ap_list:
-                        ap_dn = ap["fvAp"]["attributes"]["dn"]
-                        
-                        self.check_and_wait_till_locked()
-                        fault_query_string = "rsp-subtree-include=fault-records,no-scoped,subtree"
-                        faults_list = aci_local_object.get_mo_related_item(ap_dn, fault_query_string, "")
-                        faults_dict = self.get_dict_records(faults_list, "faultRecords")
-
-                        self.check_and_wait_till_locked()
-                        events_query_string = "rsp-subtree-include=event-logs,no-scoped,subtree"
-                        events_list = aci_local_object.get_mo_related_item(ap_dn, events_query_string, "")
-                        events_dict = self.get_dict_records(events_list, "eventRecords")
-
-                        self.check_and_wait_till_locked()
-                        audit_logs_query_string = "rsp-subtree-include=audit-logs,no-scoped,subtree"
-                        audit_logs_list = aci_local_object.get_mo_related_item(ap_dn, audit_logs_query_string, "")
-                        audit_logs_dict = self.get_dict_records(audit_logs_list, "auditLogRecords")
-                        
-                        self.check_and_wait_till_locked()
-                        health_records = aci_local_object.get_mo_related_item(ap_dn, "", "HealthRecords")
-                        health_records_dict = self.get_dict_records(health_records, "healthRecords")
-
-                        apHistoryData = [faults_dict, health_records_dict, events_dict, audit_logs_dict, timeStamp]
-                        
-                        self.databaseObject.insertOrUpdate("ApHistory", ap_dn, apHistoryData)
-                        # self.get_ap_summary(ap_dn, timeStamp)
-
-                else:
-                    logger.warning("Application Profiles not found")
-        except Exception as ex:
-            logger.exception("Exception while processing Application Profile History : " + str(ex))
-        finally:
-            end_time =  datetime.datetime.now()
-            logger.info("Time for get_ap_history: " + str(end_time - start_time))
-    
-
-    def get_ap_summary(self, ap_dn, timeStamp, aci_local_object):
-        start_time = datetime.datetime.now()
-        try:
-            # aci_local_object = aci_local.ACI_Local("")
-            
-            epg_query_string = "query-target=subtree&target-subtree-class=fvAEPg"
-            epg_list = aci_local_object.get_mo_related_item(ap_dn, epg_query_string, "")
-            epgs_dict = self.get_dict_records(epg_list, "epgRecords")
-            
-            useg_epg_query_string = "query-target=subtree&target-subtree-class=fvAEPg&query-target-filter=eq(fvAEPg.isAttrBasedEPg,\"true\")&rsp-subtree=children&rsp-subtree-class=fvRsBd"
-            useg_epg_list = aci_local_object.get_mo_related_item(ap_dn, useg_epg_query_string, "")
-            useg_epgs_dict = self.get_dict_records(useg_epg_list, "usegEpgRecords")
-            
-            ap_summary_data = [epgs_dict, useg_epgs_dict, timeStamp]
-
-            self.databaseObject.insertOrUpdate("ApSummary", ap_dn, ap_summary_data)
-
-        except Exception as ex:
-            logger.exception("Exception while processing Ap Summary \n Error :  " + str(ex))
-        finally:
-            end_time =  datetime.datetime.now()
-            logger.info("Time for get_ap_summary: " + str(end_time - start_time))
-
-
     def get_config_data(self, data_key):
         start_time = datetime.datetime.now()
         path = "/home/app/data/credentials.json"
@@ -813,7 +640,6 @@ class AppD(object):
             self.databaseObject = AppD_Database.Database()
             self.check_connection()
             logger.info('===Starting Database Update!')
-            
             
             try:
                 apps = self.get_app_info()
@@ -941,16 +767,6 @@ class AppD(object):
                     self.databaseObject.checkAndDelete('HealthViolations', violationList)
                     self.databaseObject.checkAndDelete('Nodes', nodeidlist)
 
-                    self.databaseObject.commitSession()
-
-                    aci_local_object = aci_local.ACI_Local("")
-
-                    self.check_and_wait_till_locked()
-                    self.get_epg_history(timeStamp, aci_local_object)
-                    
-                    self.check_and_wait_till_locked()
-                    self.get_ap_history(timeStamp, aci_local_object)
-                    
                     self.databaseObject.commitSession()
 
                     polling_interval = self.get_config_data("polling_interval")

@@ -419,12 +419,15 @@ def saveMapping(appDId, tenant, mappedData):
 
 def getFaults(dn):
     """
-    Get List of Faults related to the given MO from Database
+    Get List of Faults related to the given MO.
     """
-    faults_resp = database_object.returnFaults(dn)
-    if faults_resp["status"]:
-        faults_list = faults_resp["payload"]
+    start_time = datetime.datetime.utcnow()
+    aci_local_object = aci_local.ACI_Local("")
+    faults_resp = aci_local_object.get_ap_epg_faults(start_time, dn)
+
+    if faults_resp:
         faults_payload = []
+        faults_list = faults_resp["faultRecords"]
         for fault in faults_list:
             fault_attr = fault["faultRecord"]["attributes"]
             fault_dict = {
@@ -441,21 +444,24 @@ def getFaults(dn):
             "payload": faults_payload
         })
     else:
-        logger.error("Error in fetching Fault List from Databse!")
+        logger.error("Error in fetching Fault List!")
         return json.dumps({
             "status_code": "300",
-            "message": faults_resp["message"],
+            "message": "Error while fetching Fault details.",
             "payload": []
         })
 
 def getEvents(dn):
     """
-    Get List of Events related to the given MO from Database
+    Get List of Events related to the given MO.
     """
-    events_resp = database_object.returnEvents(dn)
-    if events_resp["status"]:
-        events_list = events_resp["payload"]
+    start_time = datetime.datetime.utcnow()
+    aci_local_object = aci_local.ACI_Local("")
+    events_resp = aci_local_object.get_ap_epg_events(start_time, dn)
+
+    if events_resp:
         events_payload = []
+        events_list = events_resp["eventRecords"]
         for event in events_list:
             event_attr = event["eventRecord"]["attributes"]
             event_dict = {
@@ -473,21 +479,25 @@ def getEvents(dn):
             "payload": events_payload
         })
     else:
-        logger.error("Error in fetching Event List from Databse!")
+        logger.error("Error in fetching Event List!")
         return json.dumps({
             "status_code": "300",
-            "message": events_resp["message"],
+            "message": "Error while fetching Event details.",
             "payload": []
         })
 
 def getAuditLogs(dn):
     """
-    Get List of Audit Log Records related to the given MO from Database
+    Get List of Audit Log Records related to the given MO.
     """
-    audit_logs_resp = database_object.returnAuditLogs(dn)
-    if audit_logs_resp["status"]:
-        audit_logs_list = audit_logs_resp["payload"]
+
+    start_time = datetime.datetime.utcnow()
+    aci_local_object = aci_local.ACI_Local("")
+    audit_logs_resp = aci_local_object.get_ap_epg_audit_logs(start_time, dn)
+
+    if audit_logs_resp:
         audit_logs_payload = []
+        audit_logs_list = audit_logs_resp["auditLogRecords"]
         for audit_log in audit_logs_list:
             audit_log_attr = audit_log["aaaModLR"]["attributes"]
             audit_log_dict = {
@@ -505,10 +515,10 @@ def getAuditLogs(dn):
             "payload": audit_logs_payload
         })
     else:
-        logger.error("Error in fetching Audit Logs List from Databse!")
+        logger.error("Error in fetching Audit Logs List!")
         return json.dumps({
             "status_code": "300",
-            "message": audit_logs_resp["message"],
+            "message": "Error while fetching Audit log details.",
             "payload": []
         })
 
