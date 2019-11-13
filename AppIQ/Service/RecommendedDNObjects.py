@@ -1,11 +1,11 @@
 __author__ = 'nilayshah'
 
-import AppD_Alchemy as database
-import json, pprint
-import ACI_Local as aci_local
-db_object = database.Database()
-from flask import current_app
+import alchemy as database
+import json
+import aci_utils
 from custom_logger import CustomLogger
+
+db_object = database.Database()
 
 logger = CustomLogger.get_logger("/home/app/log/app.log")
 
@@ -23,7 +23,10 @@ class Recommend(object):
         return common_list
 
 
-    def extract(self,dn):
+    def extract(self, dn):
+        """
+        Extract ap and epg from given dn
+        """
         ap = dn.split('/')[2].split('-',1)[1]
         epg = dn.split('/')[3].split('-',1)[1]
         return ap, epg
@@ -41,7 +44,7 @@ class Recommend(object):
     #         "epg22":1
     #     }
     # }
-    def extract_ap_and_epgs(self,eps):
+    def extract_ap_and_epgs(self, eps):
         count_dict = {}
         for ep in eps:
             ap, epg = self.extract(ep['dn'])
@@ -55,7 +58,7 @@ class Recommend(object):
 
 
     # returns a list of list
-    def determine_recommendation(self,extract_ap_epgs,common_eps):
+    def determine_recommendation(self, extract_ap_epgs, common_eps):
         recommendation_list = []
         key = ''
         for each in common_eps:
@@ -103,6 +106,7 @@ class Recommend(object):
 
         for a in recommendation_list:
             for b in recommendation_list:
+                # If same recommendation already exist with b[2] == 'None' than remove it.
                 if a[0] == b[0] and a[1] == b[1] and (a[2] == 'Yes' or a[2] == 'No') and b[2] == 'None':
                     recommendation_list.remove(b)
         return recommendation_list
@@ -138,6 +142,9 @@ class Recommend(object):
     #     }
     # ]
     def generatelist(self,ipList):
+        """
+        Generate list based on the IP or Mac.
+        """
         src_clus_list = []
         ips = []
         macs = []
@@ -169,17 +176,20 @@ class Recommend(object):
 
 
     def correlate_aci_appd(self, tenant, appId):
+        """
+        Correlate API with AppDynamics
+        """
         logger.info('Finding Correlations for ACI and AppD')
 
-        aci_local_object = aci_local.ACI_Local(tenant)
-        end_points = aci_local_object.apic_fetchEPData(tenant)
+        aci_util_obj = aci_utils.ACI_Utils(tenant)
+        end_points = aci_util_obj.apic_fetchEPData(tenant)
         if not end_points:
             logger.error('Error: Empty end_points ' + str(end_points))
             return []
 
         try:
             # returns dn, ip and tenant info for each ep
-            parsed_eps = aci_local_object.parseEPs(end_points,tenant)
+            parsed_eps = aci_util_obj.parseEPs(end_points,tenant)
             if not parsed_eps:
                 logger.error('Error: Empty parsed_eps ' + str(parsed_eps))
                 return []
@@ -196,7 +206,7 @@ class Recommend(object):
 
         common_eps = []
         # Get all nodes for the app
-        appd_nodes = list(set(db_object.ipsforapp(appId)))
+        appd_nodes = list(set(db_object.ips_for_app(appId)))
         logger.info('AppD IPs: '+str(appd_nodes))
         ip_list = []
         mac_nodes_dict = {}
@@ -206,7 +216,7 @@ class Recommend(object):
 
         for node in appd_nodes:
             if node.macAddress:
-                logger.info('Node {} with MAC address {}'.format(str(node.nodeId), str(node.macAddress)))
+                logger.debug('Node {} with MAC address {}'.format(str(node.nodeId), str(node.macAddress)))
                 node_mac_list = node.macAddress
                 for node_mac in node_mac_list:
                     if node_mac not in mac_nodes_dict.keys():
@@ -215,13 +225,14 @@ class Recommend(object):
                         if node not in mac_nodes_dict[node_mac]:
                             mac_nodes_dict[node_mac].append(node)
             else:
-                logger.info('Node {} with IP address {}'.format(str(node.nodeId), str(node.ipAddress)))
+                logger.debug('Node {} with IP address {}'.format(str(node.nodeId), str(node.ipAddress)))
                 ip_list += node.ipAddress
 
         logger.debug("mac_nodes_dict:::"+str(mac_nodes_dict))
 
         for mac,nodes in mac_nodes_dict.items():
-            check,dn = aci_local_object.get_unicast_routing(mac)
+            # If mac exist and unicast routing is true then consider mac
+            check,dn = aci_util_obj.get_unicast_routing(mac)
             if not check:
                 logger.info('Check failed for MAC address {}'.format(str(mac)))
                 for each_node in nodes:
@@ -234,7 +245,7 @@ class Recommend(object):
         # Extract common based on Ips
         try:
             common_eps += self.getCommonEPs(ip_list, parsed_eps)
-            logger.info('Common EPs:'+str(common_eps))
+            logger.debug('Common EPs:'+str(common_eps))
             if common_eps:
                 extract_ap_epgs = self.extract_ap_and_epgs(common_eps)
             else:
@@ -246,8 +257,9 @@ class Recommend(object):
         try:
             rec_list = self.determine_recommendation(extract_ap_epgs,common_eps)
         except Exception as e:
-            logger.exception('Exception in rec list, Error:'+str(e))
+            logger.exception('Exception while determining recommended list, Error:'+str(e))
             return []
+        
         if rec_list:
             logger.info('Recommendation list for app:'+str(appId)+'  rec_list= '+str(rec_list))
             fin_list = set(map(tuple,rec_list))
@@ -256,11 +268,13 @@ class Recommend(object):
         else:
             logger.info('Error: Empty rec_list ' + str(rec_list))
             return []
+        
         try:
             generated_list = self.generatelist(final_list)
         except Exception as e:
             logger.exception('Exception in generate list, Error:'+str(e))
             return []
+        
         if generated_list:
             logger.info('Generated List = '+str(generated_list))
             return generated_list
