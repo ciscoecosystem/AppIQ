@@ -139,7 +139,8 @@ export default class DataTable extends Component {
       let url = document.location.origin + "/appcenter/Cisco/AppIQ/graphql.json";
       try {
         xhr.open("POST", url, true);
-
+        window.APIC_DEV_COOKIE = getCookie("app_Cisco_AppIQ_token");
+        window.APIC_URL_TOKEN = getCookie("app_Cisco_AppIQ_urlToken");
         xhr.setRequestHeader("Content-type", "application/json");
         xhr.setRequestHeader("DevCookie", window.APIC_DEV_COOKIE);
         xhr.setRequestHeader("APIC-challenge", window.APIC_URL_TOKEN);
