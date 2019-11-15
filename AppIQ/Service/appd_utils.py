@@ -446,9 +446,6 @@ class AppD(object):
         except Exception as e:
             logger.exception('HEV API call failed,  ' + str(e))
             return []
-        finally:
-            end_time =  datetime.datetime.now()
-            logger.info("Time for get_health_Violations: " + str(end_time - start_time))
 
 
     def getAppDApps(self):
@@ -625,6 +622,8 @@ class AppD(object):
                                                                                                 str(node_health),
                                                                                                 ipList, app.get('id'), timeStamp, macList])
                                                     nodeidlist.append(node.get('id'))
+                                                    ipList = []
+                                                    macList = []
                                                     logger.info(
                                                         'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
                                                             app.get('name')) + ', Tier - ' + str(
