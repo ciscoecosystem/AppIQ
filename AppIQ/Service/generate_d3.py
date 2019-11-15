@@ -1,5 +1,5 @@
 __author__ = 'nilayshah'
-import pprint
+
 class generateD3Dict(object):
     # Put it in another file named 'generate_d3.py'
     def health_colour(self,health):
@@ -11,22 +11,18 @@ class generateD3Dict(object):
             return 'red'
 
 
-    def generate_d3_compatible_dict(self,data):
-        #pprint.pprint(data)
+    def generate_d3_compatible_dict(self, data):
         # Get distinct app profiles
         app_profs = set()
         for node in data:
-            #pprint(node)  # Changed by Nilay
             app_profs.add(node['AppProfile'])
         app_profs_converted = []
         for app_prof in app_profs:
             # Filter out app prof nodes
             app_nodes = filter(lambda x: x['AppProfile'] == app_prof, data)
 
-            app_tree = {}
-
+            # Top level node in Tree (Application Profile)
             app_prof_node = {}
-            stage_cnt = 0
             app_prof_node['name'] = 'AppProf'
             app_prof_node['type'] = '#581552'
             app_prof_node['level'] = self.health_colour(app_nodes[0]['appHealth'])
@@ -38,7 +34,8 @@ class generateD3Dict(object):
             }
             app_prof_node['children'] = []
 
-            # distinct EPGs
+            # 2nd layer nodes in Tree (EPG)
+            # distinct EPGs for current application profile
             epgs = set()
             for app_node in app_nodes:
                 epgs.add(app_node['EPG'])
@@ -48,6 +45,7 @@ class generateD3Dict(object):
             for epg in epgs:
                 distinct_epg_tiers = set()
                 distinct_epg_ips = set()
+                # Extract EPG nodes with same EPG value and get distinct tier name and ip
                 epg_nodes = filter(lambda x: x['EPG'] == epg, app_nodes)
                 for epg_node in epg_nodes:
                     distinct_epg_tiers.add(epg_node['tierName'])
@@ -94,7 +92,6 @@ class generateD3Dict(object):
                         distinct_ep_tiers.add(ep_node['tierName'])
                     ep_dict = {}
                     ep_dict['name'] = "EP"
-                    # ep_dict['x'] =
                     ep_dict['type'] = '#2DBBAD'
                     ep_dict['level'] = self.health_colour(ep_nodes[0]['tierHealth'])
                     ep_dict['sub_label'] = ep_nodes[0]['VM-Name']
@@ -102,15 +99,14 @@ class generateD3Dict(object):
 
 
                     sep_list_dict = {}
-                    for ep_node in ep_nodes:
-                        if (ep_node['serviceEndpoints']):
-                            for sep in ep_node['serviceEndpoints']:
-                                sep_list_dict[sep['sepName']] = sep
-
                     hrv_list_dict = {}
                     for ep_node in ep_nodes:
-                        if (ep_node['tierViolations']):
-                            for hrv in ep_node['tierViolations']:
+                        if (ep_node.get('serviceEndpoints')):
+                            for sep in ep_node.get('serviceEndpoints'):
+                                sep_list_dict[sep['sepName']] = sep
+
+                        if (ep_node.get('tierViolations')):
+                            for hrv in ep_node.get('tierViolations'):
                                 if hrv:#.get('Violation Id'):
                                     hrv_list_dict[hrv['Violation Id']] = hrv
                     ep_dict['attributes'] = {

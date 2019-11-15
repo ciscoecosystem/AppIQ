@@ -1,8 +1,5 @@
 __author__ = 'nilayshah'
 import graphene
-# from graphene import relay
-# from graphene_sqlalchemy import SQLAlchemyConnectionField, SQLAlchemyObjectType
-# import sqlite3
 import plugin_server as app
 
 class Check(graphene.ObjectType):
@@ -29,27 +26,35 @@ class SaveMapping(graphene.ObjectType):
 class GetFaults(graphene.ObjectType):
     faultsList = graphene.String()
 
+
 class GetEvents(graphene.ObjectType):
     eventsList = graphene.String()
+
 
 class GetAuditLogs(graphene.ObjectType):
     auditLogsList = graphene.String()
 
+
 class GetOperationalInfo(graphene.ObjectType):
     operationalList = graphene.String()
+
 
 class GetConfiguredAccessPolicies(graphene.ObjectType):
     accessPoliciesList = graphene.String()
 
+
 class GetToEpgTraffic(graphene.ObjectType):
     toEpgTrafficList = graphene.String()
+
 
 class GetSubnets(graphene.ObjectType):
     subnetsList = graphene.String()
 
+
 class SetPollingInterval(graphene.ObjectType):
     status = graphene.String()
     message = graphene.String()
+
 
 class Run(graphene.ObjectType):
     response = graphene.String()
@@ -86,35 +91,35 @@ class Query(graphene.ObjectType):
     Details = graphene.Field(Details, tn=graphene.String(), appId=graphene.String())
 
     def resolve_GetFaults(self, info, dn):
-        GetFaults.faultsList = app.getFaults(dn)
+        GetFaults.faultsList = app.get_faults(dn)
         return GetFaults
 
     def resolve_GetEvents(self, info, dn):
-        GetEvents.eventsList = app.getEvents(dn)
+        GetEvents.eventsList = app.get_events(dn)
         return GetEvents
 
     def resolve_GetAuditLogs(self, info, dn):
-        GetAuditLogs.auditLogsList = app.getAuditLogs(dn)
+        GetAuditLogs.auditLogsList = app.get_audit_logs(dn)
         return GetAuditLogs
     
     def resolve_GetOperationalInfo(self, info, dn, moType, ipList):
-        GetOperationalInfo.operationalList = app.getChildrenEpInfo(dn, moType, ipList)
+        GetOperationalInfo.operationalList = app.get_childrenEp_info(dn, moType, ipList)
         return GetOperationalInfo
 
     def resolve_GetConfiguredAccessPolicies(self, info, tn, ap, epg):
-        GetConfiguredAccessPolicies.accessPoliciesList = app.getConfiguredAccessPolicies(tn, ap, epg)
+        GetConfiguredAccessPolicies.accessPoliciesList = app.get_configured_access_policies(tn, ap, epg)
         return GetConfiguredAccessPolicies
 
     def resolve_GetToEpgTraffic(self, info, dn):
-        GetToEpgTraffic.toEpgTrafficList = app.getToEpgTraffic(dn)
+        GetToEpgTraffic.toEpgTrafficList = app.get_to_Epg_traffic(dn)
         return GetToEpgTraffic
 
     def resolve_GetSubnets(self, info, dn):
-        GetSubnets.subnetsList = app.getSubnets(dn)
+        GetSubnets.subnetsList = app.get_subnets(dn)
         return GetSubnets
     
     def resolve_SetPollingInterval(self, info, interval):
-        status, message = app.setPollingInterval(interval)
+        status, message = app.set_polling_interval(interval)
         SetPollingInterval.status = status
         SetPollingInterval.message = message
         return SetPollingInterval
@@ -155,7 +160,7 @@ class Query(graphene.ObjectType):
         #    mappedData = args.get('data')
         mappedData = data
         #print info
-        SaveMapping.savemapping = app.saveMapping(int(appId), str(tn), mappedData)
+        SaveMapping.savemapping = app.save_mapping(int(appId), str(tn), mappedData)
         return SaveMapping
 
     def resolve_Run(self, info, tn, appId):  # On APIC
@@ -178,94 +183,3 @@ class Query(graphene.ObjectType):
 
 
 schema = graphene.Schema(query=Query)
-
-
-
-
-
-# query{
-#   Mapping(tn:"AppDControllerTenant", appId:"7"){
-#     mappings
-#   }
-# }
-
-# query{
-#   Application {
-#     apps
-#   }
-# }
-
-# query{
-#   SaveMapping(appId:"7"
-#     ,data:"[{'domains':[{'domainName':'uni/tn-AppDControllerTenant/ap-AppDController-AP1/epg-AppDControllerEPG1'}],'ipaddress': '192.168.128.16'}]")
-#   {
-#     savemapping
-#   }
-# }
-
-# query{
-#   Details(tn:"AppDControllerTenant",appId:"7"){
-#     details
-#   }
-# }
-
-# query{
-#   Run(tn:"AppDControllerTenant",appId:"7"){
-#     response
-#   }
-# }
-
-# query{
-#   Details(tn:"AppDControllerTenant",appId:"7"){
-#     details
-#   }
-# }
-
-
-
-
-# ====== DMZ =======
-# query{
-#   Check{
-#     checkpoint
-#   }
-# }
-
-# query{
-#   LoginApp(ip:"192.168.132.125",username:"user1",account:"customer1",password:"Cisco!123"){
-#     loginStatus
-#     loginMessage
-#   }
-# }
-
-# query{
-#   Application {
-#     apps
-#   }
-# }
-
-# query{
-#   Mapping(tn:"AppDynamics", appId:"5"){
-#     mappings
-#   }
-
-# query{
-#   SaveMapping(appId:"5"
-#     ,data:"[{'domains':[{'domainName':'uni/tn-AppDynamics/ap-AppD-AP1-EcommerceApp/epg-AppD-Ecomm'}],'ipaddress': '10.10.10.15'},{'domains':[{'domainName':'uni/tn-AppDynamics/ap-AppD-AP1-EcommerceApp/epg-AppD-Pay'}],'ipaddress': '10.10.10.21'}]")
-#   {
-#     savemapping
-#   }
-# }
-
-# query{
-#   Details(tn:"AppDynamics",appId:"5"){
-#     details
-#   }
-# }
-
-# query{
-#   Run(tn:"AppDynamics",appId:"5"){
-#     response
-#   }
-# }
-#

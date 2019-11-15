@@ -1,17 +1,15 @@
 __author__ = 'nilayshah'
 
-from flask import Flask, render_template, request, redirect, url_for, jsonify
-import json, time, logging, os, pprint
-import threading
+import json, time, os
 import socket
 import re
 import datetime
-# import ACI_Info as aci_local
-import ACI_Local as aci_local
-import AppDInfoData as AppDConnect
-import AppD_Alchemy as Database
+import aci_utils
+import appd_utils
+import alchemy as database
 import generate_d3 as d3
 import RecommendedDNObjects as Recommend
+from flask import Flask
 from multiprocessing import Process, Value
 from custom_logger import CustomLogger
 
@@ -20,62 +18,45 @@ app.debug = True
 
 logger = CustomLogger.get_logger("/home/app/log/app.log")
 
-# appd_object = AppDConnect.AppD('10.23.239.14', 'user1', 'customer1', 'welcome')
-# appd_object = AppDConnect.AppD('192.168.132.125', 'user1', 'customer1', 'Cisco!123')
-
-# To run anywhere other than APIC
-# aci_object = aci_local.ACI("10.23.239.23", "admin", "cisco123")
-# aci_object = aci_local.ACI("192.168.130.10", "admin", "Cisco!123")
-database_object = Database.Database()
+database_object = database.Database()
 d3Object = d3.generateD3Dict()
+credintial_file_path = '/home/app/data/credentials.json'
 
 
-def getInstanceName():
-    instance_path = '/home/app/data/credentials.json' # On APIC
-    instance_exists = os.path.isfile(instance_path)
-    if instance_exists:
+def get_instance_name():
+    """
+    Get instance name from file.
+    """
+    file_exists = os.path.isfile(credintial_file_path)
+    instance_name = "N/A"
+    if file_exists:
         try:
-            with open(instance_path, 'r') as creds:
-                instance_creds = json.load(creds)
-                instanceName = str(str(instance_creds['appd_ip']).split('//')[1])
-                #print "AppD Controller = "+ instanceName
-                return instanceName
+            with open(credintial_file_path, 'r') as creds:
+                creds = json.load(creds)
+                instance_name = str(str(creds['appd_ip']).split('//')[1])
         except:
-            instanceName = "N/A"
-            pass
+            instance_name = "N/A"
     else:
-        return "N/A"
+        instance_name = "N/A"
+    return instance_name
 
 
 @app.route('/check.json', methods=['GET', 'POST'])
 def checkFile():
     start_time = datetime.datetime.now()
     logger.info('Checking if File Exists')
-    path = '/home/app/data/credentials.json'
-    # path = "/Users/nilayshah/Desktop/AppD_cisco23lab/Cisco_AppIQ/Service/credentials.json"
-    file_exists = os.path.isfile(path)
-    # print file_exists
-    if not file_exists:
-        end_time =  datetime.datetime.now()
-        logger.error("Time for checkFile File NOT found: " + str(end_time - start_time))
-        
-        return json.dumps({"payload": "File does not exists", "status_code": "300",
-                           "message": "AppDynamics is not configured. Please login!"})
-        # return 'False'
-    else:
+    file_exists = os.path.isfile(credintial_file_path)
+    if file_exists:
         try:
-            with open(path, 'r') as creds:
-                # with open('/Users/nilayshah/Desktop/AppD_cisco23lab/Cisco_AppIQTest/Service/credentials.json', 'w+') as creds:
+            with open(credintial_file_path, 'r') as creds:
                 app_creds = json.load(creds)
-                appd_ip = app_creds["appd_ip"]
-                appd_port = app_creds["appd_port"]
-                appd_user = app_creds["appd_user"]
-                appd_account = app_creds["appd_account"]
-                appd_pw = app_creds["appd_pw"]
-            # print appd_ip
-            appd_object = AppDConnect.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
+                appd_ip = app_creds.get("appd_ip")
+                appd_port = app_creds.get("appd_port")
+                appd_user = app_creds.get("appd_user")
+                appd_account = app_creds.get("appd_account")
+                appd_pw = app_creds.get("appd_pw")
+            appd_object = appd_utils.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
             status = appd_object.check_connection()
-            # print status - Change it to logger
             if status == 200 or status == 201:
                 return json.dumps({"payload": "Signed in", "status_code": "200", "message": "OK"})
             else:
@@ -88,14 +69,22 @@ def checkFile():
         finally:
             end_time =  datetime.datetime.now()
             logger.info("Time for checkFile: " + str(end_time - start_time))
-    
+    else:
+        end_time =  datetime.datetime.now()
+        logger.error("Time for checkFile File NOT found: " + str(end_time - start_time))
+        
+        return json.dumps({"payload": "File does not exists", "status_code": "300",
+                           "message": "AppDynamics is not configured. Please login!"})    
 
 
-def parseHost(ip):
+def parse_host(host):
+    """
+    Returns ip for host.
+    """
     try:
-        parsed_host = socket.gethostbyname(ip)
+        parsed_host = socket.gethostbyname(host)
         if parsed_host:
-            return ip
+            return host
     except:
         return ""
 
@@ -104,34 +93,31 @@ def parseHost(ip):
 def login(appd_creds):
     start_time = datetime.datetime.now()
     logger.info('Entered Login')
-    host = str(appd_creds["appd_ip"])
-    appd_port = str(appd_creds["appd_port"])
-    appd_user = str(appd_creds["appd_user"])
-    appd_account = str(appd_creds["appd_account"])
-    appd_pw = str(appd_creds["appd_pw"])
+    host = str(appd_creds.get("appd_ip"))
+    appd_port = str(appd_creds.get("appd_port"))
+    appd_user = str(appd_creds.get("appd_user"))
+    appd_account = str(appd_creds.get("appd_account"))
+    appd_pw = str(appd_creds.get("appd_pw"))
     if 'http://' in host or 'https://' in host:
         parsed_ip = host.split('://')[1]
         if '/' in parsed_ip:
             ip = parsed_ip.split('/')[0]
         else:
             ip = parsed_ip
-        valid_ip = parseHost(ip)
+        valid_ip = parse_host(ip)
         proto = host.split('://')[0]
         appd_ip = proto + "://"+valid_ip
     else:
-        appd_ip = "https://"+parseHost(host)
-    # parsed_host = parseHost(appd_ip)
-    credentials = {'appd_ip': appd_ip, 'appd_port': appd_port, 'appd_user': appd_user, 'appd_account': appd_account,
-                   'appd_pw': appd_pw, 'polling_interval': '1'}
-    sleep_cred = {'sleep_var': '0'}
-    appd_object = AppDConnect.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
+        appd_ip = "https://"+parse_host(host)
+
+    appd_object = appd_utils.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
     try:
         login_check = appd_object.check_connection()
-        # print login_check
 
         if login_check == 200 or login_check == 201:
-            # path = "/Users/nilayshah/Desktop/AppD_cisco23lab/Cisco_AppIQ/Service/credentials.json"
-            path = "/home/app/data/credentials.json"
+            credentials = {'appd_ip': appd_ip, 'appd_port': appd_port, 'appd_user': appd_user, 'appd_account': appd_account,
+                        'appd_pw': appd_pw, 'polling_interval': '1'}
+            sleep_cred = {'sleep_var': '0'}
 
             # New file for sleep_var
             with open("/home/app/data/SleepVar.json", 'w+') as screds:
@@ -143,15 +129,13 @@ def login(appd_creds):
             # This is the main process being started.
             Process(target=appd_object.main).start()
             
-            # with open('/home/app/credentials/credentials.json', 'w+') as creds:
-            with open(path, 'w+') as creds:
+            with open(credintial_file_path, 'w+') as creds:
                 creds.seek(0)
                 creds.truncate()
                 json.dump(credentials, creds)
                 creds.close()
             logger.info('Login Successful!')
-            #threading.Thread(target=appd_object.main).start()#appd_object.main()
-            # time.sleep(4)
+
             return json.dumps({"payload": "Connection Successful", "status_code": "200",
                                "message": "Credentials Saved!"})  # login_resp
         else:
@@ -168,16 +152,15 @@ def login(appd_creds):
         logger.info("Time for LOGIN to APP: " + str(end_time - start_time))
 
 
-def setPollingInterval(interval):
+def set_polling_interval(interval):
     """
     Sets the polling interval in AppDynamics config file
     """
 
     start_time = datetime.datetime.now()
-    path = "/home/app/data/credentials.json"
     try:
-        if os.path.isfile(path):
-            with open(path, "r+") as creds:
+        if os.path.isfile(credintial_file_path):
+            with open(credintial_file_path, "r+") as creds:
                 config_data = json.load(creds)
                 config_data["polling_interval"] = str(interval)
 
@@ -194,10 +177,10 @@ def setPollingInterval(interval):
         return "300", err_msg
     finally:
         end_time =  datetime.datetime.now()
-        logger.info("Time for setPollingInterval: " + str(end_time - start_time))
+        logger.info("Time for set_polling_interval: " + str(end_time - start_time))
     
 
-def setSleepVar(sleep_var):
+def set_sleep_var(sleep_var):
     """
     Sets the sleeping variable in config file
     """
@@ -226,7 +209,7 @@ def setSleepVar(sleep_var):
         return False, err_msg
     finally:
         end_time =  datetime.datetime.now()
-        logger.info("Time for setSleepVar: " + str(end_time - start_time))
+        logger.info("Time for set_sleep_var: " + str(end_time - start_time))
 
 
 #@app.route('/apps.json', methods=['GET'])  # This shall be called from /check.json, for Cisco Live this is the first/start Route
@@ -235,21 +218,19 @@ def apps(tenant):
     try:
         logger.info("UI Action app.json started")
         
-        appsList = database_object.getappList()
+        appsList = database_object.get_app_list()
         app_dict = {}
         app_list = []
         for each in appsList:
-            temp_dict = {'appProfileName': each['appName'], 'isViewEnabled': each['isViewEnabled'],
-                         'health': str(each['appHealth']), 'appId': each['appId']}
+            temp_dict = {'appProfileName': each.get('appName'), 'isViewEnabled': each.get('isViewEnabled'),
+                         'health': str(each.get('appHealth')), 'appId': each.get('appId')}
             app_list.append(temp_dict)
             if each.get('isViewEnabled') == True:
-                mapping(tenant,each['appId'])
+                mapping(tenant, each['appId'])
         app_dict['app'] = app_list
         
         logger.info("UI Action app.json ended")
-        #time.sleep(5)
-        return json.dumps({"instanceName":getInstanceName(),"payload": app_dict, "status_code": "200", "message": "OK"})
-        # return json.dumps(dict)
+        return json.dumps({"instanceName":get_instance_name(),"payload": app_dict, "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not fetch applications from databse. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch applications from databse. Error: "+str(e)})
@@ -257,7 +238,7 @@ def apps(tenant):
         end_time =  datetime.datetime.now()
         logger.info("Time for APPS: " + str(end_time - start_time))
 
-def getMappingDictTargetCluster(mapped_objects):
+def get_mapping_dict_target_cluster(mapped_objects):
     """
     return mapping dict from recommended objects
     """
@@ -286,20 +267,20 @@ def mapping(tenant, appDId):
         mapping_dict = {"source_cluster": [], "target_cluster": []}
         
         # returns the mapping from Mapping Table
-        already_mapped_data = database_object.returnMapping(appId)
+        already_mapped_data = database_object.return_mapping(appId)
         rec_object = Recommend.Recommend()
         mapped_objects = rec_object.correlate_aci_appd(tenant, appDId)        
 
         if not mapped_objects:
             logger.info('Empty Mapping dict for appDId:'+str(appDId))
-            return json.dumps({"instanceName":getInstanceName(),"payload": mapping_dict, 
+            return json.dumps({"instanceName":get_instance_name(),"payload": mapping_dict, 
                                "status_code": "200","message": "OK"})
 
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
 
             # Get new mapping based on recommendation which may have new nodes
-            current_mapping = getMappingDictTargetCluster(mapped_objects)
+            current_mapping = get_mapping_dict_target_cluster(mapped_objects)
             new_nodes = []
             is_mapping_changed = False
             for new_map in current_mapping:
@@ -326,31 +307,31 @@ def mapping(tenant, appDId):
 
             if len(new_nodes) > 0 or is_mapping_changed:
                 # If new node found, generate new mapping and save it in DB
-                database_object.checkIfExistsandUpdate('Mapping', [appId, current_mapping])
+                database_object.check_if_exists_and_update('Mapping', [appId, current_mapping])
                 mapping_dict['target_cluster'] = [node for node in current_mapping if node.get('disabled') == False]
             else:
                 mapping_dict['target_cluster'] = [node for node in already_mapped_data if node.get('disabled') == False]
         else:
             logger.info("Mapping Empty!")
-            app_list = database_object.getappList()
+            app_list = database_object.get_app_list()
             logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
             
-            # TODO: Why not get the App with given AppId from DB?? with a where claws
+            # TODO: Why not get the App with given AppId from DB?? with a where clause
             for app in app_list:
                 if app.get('appId') == appDId and app.get('isViewEnabled') == True:
-                    target = getMappingDictTargetCluster(mapped_objects)
+                    target = get_mapping_dict_target_cluster(mapped_objects)
                     mapping_dict['target_cluster'] = target
                                        
                     # Put mapping in DB
-                    database_object.checkIfExistsandUpdate('Mapping', [appId, target])
+                    database_object.check_if_exists_and_update('Mapping', [appId, target])
                     
                     # TODO: See the use of enableView
-                    enableView(appId, True)
+                    enable_view(appId, True)
 
         for new_object in mapped_objects:
             mapping_dict['source_cluster'].append(new_object)
 
-        return json.dumps({"instanceName":getInstanceName(),
+        return json.dumps({"instanceName":get_instance_name(),
                            "payload": mapping_dict, # {"source_cluster": mapped_objects, "target_cluster": {{dn:IP},{dn:IP}}}
                            "status_code": "200",
                            "message": "OK"})
@@ -361,7 +342,8 @@ def mapping(tenant, appDId):
         end_time =  datetime.datetime.now()
         logger.info("Time for MAPPING: " + str(end_time - start_time))
 
-def parseMappingBeforeSave(already_mapped_data, data_list):
+
+def parse_mapping_before_save(already_mapped_data, data_list):
     """
     Set disabled value true if user has disabled particular node manually.
     """
@@ -384,7 +366,10 @@ def parseMappingBeforeSave(already_mapped_data, data_list):
             
 
 @app.route('/saveMapping.json', methods=['POST'])
-def saveMapping(appDId, tenant, mappedData):
+def save_mapping(appDId, tenant, mappedData):
+    """
+    Save mapping to database.
+    """
     start_time = datetime.datetime.now()
     try:
         appId = str(appDId) + str(tenant)
@@ -393,21 +378,21 @@ def saveMapping(appDId, tenant, mappedData):
             (str(mappedData).strip("'<>() ").replace('\'', '\"')))  # new implementation for GraphQL
         data_list = []
 
-        already_mapped_data = database_object.returnMapping(appId)
+        already_mapped_data = database_object.return_mapping(appId)
         for mapping in mappedData_dict:
             if mapping.get('ipaddress') != "":
-                data_list.append({'ipaddress': mapping['ipaddress'], 'domainName': mapping['domains'][0]['domainName'], 'disabled': False})
+                data_list.append({'ipaddress': mapping.get('ipaddress'), 'domainName': mapping['domains'][0]['domainName'], 'disabled': False})
             elif mapping.get('macaddress') != "":
-                data_list.append({'macaddress': mapping['macaddress'], 'domainName': mapping['domains'][0]['domainName'], 'disabled': False})
+                data_list.append({'macaddress': mapping.get('macaddress'), 'domainName': mapping['domains'][0]['domainName'], 'disabled': False})
 
         if not data_list:
-            database_object.deleteEntry('Mapping', appId)
-            #enableView(appDId, False)
+            database_object.delete_entry('Mapping', appId)
+            #enable_view(appDId, False)
         else:
-            data_list = parseMappingBeforeSave(already_mapped_data, data_list)
-            database_object.deleteEntry('Mapping', appId)
-            database_object.checkIfExistsandUpdate('Mapping', [appId, data_list])
-            enableView(appDId, True)
+            data_list = parse_mapping_before_save(already_mapped_data, data_list)
+            database_object.delete_entry('Mapping', appId)
+            database_object.check_if_exists_and_update('Mapping', [appId, data_list])
+            enable_view(appDId, True)
         return json.dumps({"payload": "Saved Mappings", "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not save mappings to the database. Error: "+str(e))
@@ -417,25 +402,25 @@ def saveMapping(appDId, tenant, mappedData):
         logger.info("Time for saveMapping: " + str(end_time - start_time))
 
 
-def getFaults(dn):
+def get_faults(dn):
     """
-    Get List of Faults related to the given MO.
+    Get List of Faults from APIC related to the given Modular object.
     """
     start_time = datetime.datetime.utcnow()
-    aci_local_object = aci_local.ACI_Local("")
-    faults_resp = aci_local_object.get_ap_epg_faults(start_time, dn)
+    aci_util_obj = aci_utils.ACI_Utils("")
+    faults_resp = aci_util_obj.get_ap_epg_faults(start_time, dn)
 
     if faults_resp:
         faults_payload = []
-        faults_list = faults_resp["faultRecords"]
+        faults_list = faults_resp.get("faultRecords")
         for fault in faults_list:
-            fault_attr = fault["faultRecord"]["attributes"]
+            fault_attr = fault.get("faultRecord").get("attributes")
             fault_dict = {
-                "code" : fault_attr["code"],
-                "severity" : fault_attr["severity"],
-                "affected" : fault_attr["affected"],
-                "descr" : fault_attr["descr"],
-                "created" : fault_attr["created"]
+                "code" : fault_attr.get("code"),
+                "severity" : fault_attr.get("severity"),
+                "affected" : fault_attr.get("affected"),
+                "descr" : fault_attr.get("descr"),
+                "created" : fault_attr.get("created")
             }
             faults_payload.append(fault_dict)
         return json.dumps({
@@ -451,26 +436,26 @@ def getFaults(dn):
             "payload": []
         })
 
-def getEvents(dn):
+def get_events(dn):
     """
     Get List of Events related to the given MO.
     """
     start_time = datetime.datetime.utcnow()
-    aci_local_object = aci_local.ACI_Local("")
-    events_resp = aci_local_object.get_ap_epg_events(start_time, dn)
+    aci_util_obj = aci_utils.ACI_Utils("")
+    events_resp = aci_util_obj.get_ap_epg_events(start_time, dn)
 
     if events_resp:
         events_payload = []
-        events_list = events_resp["eventRecords"]
+        events_list = events_resp.get("eventRecords")
         for event in events_list:
-            event_attr = event["eventRecord"]["attributes"]
+            event_attr = event.get("eventRecord").get("attributes")
             event_dict = {
-                "code" : event_attr["code"],
-                "severity" : event_attr["severity"],
-                "affected" : event_attr["affected"],
-                "descr" : event_attr["descr"],
-                "created" : event_attr["created"],
-                "cause" : event_attr["cause"]
+                "code" : event_attr.get("code"),
+                "severity" : event_attr.get("severity"),
+                "affected" : event_attr.get("affected"),
+                "descr" : event_attr.get("descr"),
+                "created" : event_attr.get("created"),
+                "cause" : event_attr.get("cause")
             }
             events_payload.append(event_dict)
         return json.dumps({
@@ -486,27 +471,27 @@ def getEvents(dn):
             "payload": []
         })
 
-def getAuditLogs(dn):
+def get_audit_logs(dn):
     """
     Get List of Audit Log Records related to the given MO.
     """
 
     start_time = datetime.datetime.utcnow()
-    aci_local_object = aci_local.ACI_Local("")
-    audit_logs_resp = aci_local_object.get_ap_epg_audit_logs(start_time, dn)
+    aci_util_obj = aci_utils.ACI_Utils("")
+    audit_logs_resp = aci_util_obj.get_ap_epg_audit_logs(start_time, dn)
 
     if audit_logs_resp:
         audit_logs_payload = []
-        audit_logs_list = audit_logs_resp["auditLogRecords"]
+        audit_logs_list = audit_logs_resp.get("auditLogRecords")
         for audit_log in audit_logs_list:
-            audit_log_attr = audit_log["aaaModLR"]["attributes"]
+            audit_log_attr = audit_log.get("aaaModLR").get("attributes")
             audit_log_dict = {
-                "affected" : audit_log_attr["affected"],
-                "descr" : audit_log_attr["descr"],
-                "created" : audit_log_attr["created"],
-                "id" : audit_log_attr["id"],
-                "action" : audit_log_attr["ind"],
-                "user" : audit_log_attr["user"]
+                "affected" : audit_log_attr.get("affected"),
+                "descr" : audit_log_attr.get("descr"),
+                "created" : audit_log_attr.get("created"),
+                "id" : audit_log_attr.get("id"),
+                "action" : audit_log_attr.get("ind"),
+                "user" : audit_log_attr.get("user")
             }
             audit_logs_payload.append(audit_log_dict)
         return json.dumps({
@@ -522,9 +507,9 @@ def getAuditLogs(dn):
             "payload": []
         })
 
-def getChildrenEpInfo(dn, mo_type, ip_list):
+def get_childrenEp_info(dn, mo_type, ip_list):
     start_time = datetime.datetime.now()
-    aci_local_object = aci_local.ACI_Local("")
+    aci_util_obj = aci_utils.ACI_Utils("")
     if mo_type == "ep":
         ip_list = ip_list.split(",")
         ip_query_filter_list = []
@@ -536,30 +521,30 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
     elif mo_type == "epg":
         ep_info_query_string = 'query-target=children&target-subtree-class=fvCEp&rsp-subtree=children&rsp-subtree-class=fvRsHyper,fvRsCEpToPathEp,fvRsVm'
 
-    ep_list = aci_local_object.get_mo_related_item(dn, ep_info_query_string, "")
+    ep_list = aci_util_obj.get_mo_related_item(dn, ep_info_query_string, "")
     ep_info_list = []
     try:
         for ep in ep_list:
             ep_info_dict = dict()
 
-            ep_children = ep["fvCEp"]["children"]
-            ep_info = getEpInfo(ep_children, aci_local_object)
-            ep_attr = ep["fvCEp"]["attributes"]
+            ep_children = ep.get("fvCEp").get("children")
+            ep_info = get_ep_info(ep_children, aci_util_obj)
+            ep_attr = ep.get("fvCEp").get("attributes")
 
-            mcast_addr = ep_attr["mcastAddr"]
+            mcast_addr = ep_attr.get("mcastAddr")
             if mcast_addr == "not-applicable":
                 mcast_addr = "---"
 
             ep_info_dict = {
-                "ip" : ep_attr["ip"],
-                "mac" : ep_attr["mac"],
+                "ip" : ep_attr.get("ip"),
+                "mac" : ep_attr.get("mac"),
                 "mcast_addr" : mcast_addr,
-                "learning_source" : ep_attr["lcC"],
-                "encap" : ep_attr["encap"],
-                "ep_name" : ep_info["ep_name"],
-                "hosting_server_name" : ep_info["hosting_server_name"],
-                "iface_name" : ep_info["iface_name"],
-                "ctrlr_name" : ep_info["ctrlr_name"]
+                "learning_source" : ep_attr.get("lcC"),
+                "encap" : ep_attr.get("encap"),
+                "ep_name" : ep_info.get("ep_name"),
+                "hosting_server_name" : ep_info.get("hosting_server_name"),
+                "iface_name" : ep_info.get("iface_name"),
+                "ctrlr_name" : ep_info.get("ctrlr_name")
             }
             ep_info_list.append(ep_info_dict)
         return json.dumps({
@@ -576,10 +561,10 @@ def getChildrenEpInfo(dn, mo_type, ip_list):
         })
     finally:
         end_time =  datetime.datetime.now()
-        logger.info("Time for getChildrenEpInfo: " + str(end_time - start_time))
+        logger.info("Time for get_childrenEp_info: " + str(end_time - start_time))
     
 
-def getEpInfo(ep_children_list, aci_local_object):
+def get_ep_info(ep_children_list, aci_util_obj):
 
     ep_info = {
         "ctrlr_name" : "",
@@ -599,10 +584,10 @@ def getEpInfo(ep_children_list, aci_local_object):
                     ctrlr_name = ""
 
                 hyper_query_string = 'query-target-filter=eq(compHv.dn,"' + hyperDn + '")'
-                hyper_resp = aci_local_object.get_all_mo_instances("compHv", hyper_query_string)
+                hyper_resp = aci_util_obj.get_all_mo_instances("compHv", hyper_query_string)
 
-                if hyper_resp["status"]:
-                    if hyper_resp["payload"]:
+                if hyper_resp.get("status"):
+                    if hyper_resp.get("payload"):
                         hyper_name = hyper_resp["payload"][0]["compHv"]["attributes"]["name"]
                     else:
                         logger.error("Could not get Hosting Server Name using Hypervisor info")
@@ -641,10 +626,10 @@ def getEpInfo(ep_children_list, aci_local_object):
                 vm_dn = ep_child["fvRsVm"]["attributes"]["tDn"]
 
                 vm_query_string = 'query-target-filter=eq(compVm.dn,"' + vm_dn + '")'
-                vm_resp = aci_local_object.get_all_mo_instances("compVm", vm_query_string)
+                vm_resp = aci_util_obj.get_all_mo_instances("compVm", vm_query_string)
 
-                if vm_resp["status"]:
-                    if vm_resp["payload"]:
+                if vm_resp.get("status"):
+                    if vm_resp.get("payload"):
                         vm_name = vm_resp["payload"][0]["compVm"]["attributes"]["name"]
                     else:
                         logger.error("Could not get Name of EP using VM info")
@@ -656,11 +641,11 @@ def getEpInfo(ep_children_list, aci_local_object):
     return ep_info
 
 
-def getConfiguredAccessPolicies(tn, ap, epg):
+def get_configured_access_policies(tn, ap, epg):
     start_time = datetime.datetime.now()
-    aci_local_object = aci_local.ACI_Local("")
+    aci_util_obj = aci_utils.ACI_Utils("")
     cap_url = "/mqapi2/deployment.query.json?mode=epgtoipg&tn=" + tn + "&ap=" + ap + "&epg=" + epg
-    cap_resp = aci_local_object.get_mo_related_item("", cap_url, "other_url")
+    cap_resp = aci_util_obj.get_mo_related_item("", cap_url, "other_url")
     cap_list = []
     try:
         for cap in cap_resp:
@@ -741,17 +726,17 @@ def getConfiguredAccessPolicies(tn, ap, epg):
         })
     finally:
         end_time =  datetime.datetime.now()
-        logger.info("Time for getConfiguredAccessPolicies: " + str(end_time - start_time))
+        logger.info("Time for get_configured_access_policies: " + str(end_time - start_time))
 
 
-def getSubnets(dn):
+def get_subnets(dn):
     """
     Gets the Subnets Information for an EPG
     """
     start_time = datetime.datetime.now()
-    aci_local_object = aci_local.ACI_Local("")
+    aci_util_obj = aci_utils.ACI_Utils("")
     subnet_query_string = "query-target=children&target-subtree-class=fvSubnet"
-    subnet_resp = aci_local_object.get_mo_related_item(dn, subnet_query_string, "")
+    subnet_resp = aci_util_obj.get_mo_related_item(dn, subnet_query_string, "")
     subnet_list = []
     try:
         for subnet in subnet_resp:
@@ -760,7 +745,7 @@ def getSubnets(dn):
                 "to_epg" : "",
                 "epg_alias" : ""
             }
-            subnet_attr = subnet["fvSubnet"]["attributes"]
+            subnet_attr = subnet.get("fvSubnet").get("attributes")
             subnet_dict["ip"] = subnet_attr["ip"]
             subnet_list.append(subnet_dict)
         
@@ -780,15 +765,15 @@ def getSubnets(dn):
         logger.info("Time for one: " + str(end_time - start_time))
 
 
-def getToEpgTraffic(epg_dn):
+def get_to_Epg_traffic(epg_dn):
     """
     Gets the Traffic Details from the given EPG to other EPGs
     """
 
     start_time = datetime.datetime.now()
-    aci_local_object = aci_local.ACI_Local("")
+    aci_util_obj = aci_utils.ACI_Utils("")
     epg_traffic_query_string = 'query-target-filter=eq(vzFromEPg.epgDn,"' + epg_dn + '")&rsp-subtree=full&rsp-subtree-class=vzToEPg,vzRsRFltAtt,vzCreatedBy&rsp-subtree-include=required'
-    epg_traffic_resp = aci_local_object.get_all_mo_instances("vzFromEPg", epg_traffic_query_string)
+    epg_traffic_resp = aci_util_obj.get_all_mo_instances("vzFromEPg", epg_traffic_query_string)
     if epg_traffic_resp["status"]:
         epg_traffic_resp = epg_traffic_resp["payload"]
 
@@ -882,8 +867,8 @@ def getToEpgTraffic(epg_dn):
                             raise Exception("filter attribute subj_name not found")
                         
                         contract_subject = subj_tn + "/" + subj_ctrlr + "/" + subj_name
-                        flt_list = getFilterList(flt_attr_tdn, aci_local_object)
-                        ingr_pkts, egr_pkts = getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object)
+                        flt_list = get_filter_list(flt_attr_tdn, aci_util_obj)
+                        ingr_pkts, egr_pkts = getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_util_obj)
                                             
                         to_epg_traffic_dict["contract_subj"] = contract_subject
                         to_epg_traffic_dict["filter_list"] = flt_list
@@ -909,11 +894,11 @@ def getToEpgTraffic(epg_dn):
             })
         finally:
             end_time =  datetime.datetime.now()
-            logger.info("Time for getToEpgTraffic: " + str(end_time - start_time))
+            logger.info("Time for get_to_Epg_traffic: " + str(end_time - start_time))
     else:
         logger.error("Could not get Traffic Data related to EPG")
         end_time =  datetime.datetime.now()
-        logger.info("Time for getToEpgTraffic: " + str(end_time - start_time))
+        logger.info("Time for get_to_Epg_traffic: " + str(end_time - start_time))
         return json.dumps({
             "status_code": "300",
             "message": "Exception while fetching Traffic Data related to EPG",
@@ -921,18 +906,18 @@ def getToEpgTraffic(epg_dn):
         })
 
 
-def getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object):
+def getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_util_obj):
     """
     Returns the Cumulative Ingress and Egress packets information for the last 15 minutes
     """
     start_time = datetime.datetime.now()
     cur_aggr_stats_query_url = "/api/node/mo/" + from_epg_dn + "/to-[" + to_epg_dn + "]-subj-[" + subj_dn + "]-flt-" + flt_name + "/CDactrlRuleHitAg15min.json"
-    cur_aggr_stats_list = aci_local_object.get_mo_related_item("", cur_aggr_stats_query_url, "other_url")
+    cur_aggr_stats_list = aci_util_obj.get_mo_related_item("", cur_aggr_stats_query_url, "other_url")
 
     if cur_aggr_stats_list:
         cur_ag_stat_attr = cur_aggr_stats_list[0]["actrlRuleHitAg15min"]["attributes"]
-        ingr_pkts = cur_ag_stat_attr["ingrPktsCum"]
-        egr_pkts = cur_ag_stat_attr["egrPktsCum"]
+        ingr_pkts = cur_ag_stat_attr.get("ingrPktsCum")
+        egr_pkts = cur_ag_stat_attr.get("egrPktsCum")
         end_time =  datetime.datetime.now()
         logger.info("Time for getIngressEgress: " + str(end_time - start_time))
         return ingr_pkts, egr_pkts
@@ -942,14 +927,14 @@ def getIngressEgress(from_epg_dn, to_epg_dn, subj_dn, flt_name, aci_local_object
         return "0", "0"
 
 
-def getFilterList(flt_dn, aci_local_object):
+def get_filter_list(flt_dn, aci_util_obj):
     """
     Returns the list of filters for a given destination EPG
     """
     start_time = datetime.datetime.now()
     flt_list = []
     flt_entry_query_string = "query-target=children&target-subtree-class=vzRFltE"
-    flt_entries = aci_local_object.get_mo_related_item(flt_dn, flt_entry_query_string, "")
+    flt_entries = aci_util_obj.get_mo_related_item(flt_dn, flt_entry_query_string, "")
 
     for flt_entry in flt_entries:
         flt_attr = flt_entry["vzRFltE"]["attributes"]
@@ -984,55 +969,50 @@ def getFilterList(flt_dn, aci_local_object):
 
     
     end_time =  datetime.datetime.now()
-    logger.info("Time for getFilterList: " + str(end_time - start_time))
+    logger.info("Time for get_filter_list: " + str(end_time - start_time))
     return flt_list
 
 
 # This will be called from the UI - after the Mappings are completed
 @app.route('/enableView.json')
-def enableView(appid, bool):
+def enable_view(appid, bool):
     try:
-        return database_object.enableViewUpdate(appid, bool)
+        return database_object.enable_view_update(appid, bool)
     except Exception as e:
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view. Error: "+str(e)})
 
 
 @app.route('/run.json')
-def tree(tenantName, appId):
+def tree(tenant, appId):
+    """
+    Get tree view of nodes.
+    """
     try:
-        
         start_time = datetime.datetime.now()
         logger.info('UI Action TREE started')
-        setSleepVar(True)
-        aci_local_object = aci_local.ACI_Local(tenantName)
-        merged_data = merge_aci_appd(tenantName, appId, aci_local_object)
+        set_sleep_var(True)
+        aci_util_obj = aci_utils.ACI_Utils(tenant)
+        merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
         response = json.dumps(d3Object.generate_d3_compatible_dict(merged_data))
-        return json.dumps({"instanceName":getInstanceName(),"payload": response, "status_code": "200", "message": "OK"})
+        return json.dumps({"instanceName":get_instance_name(),"payload": response, "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Error while run.json" + str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
     finally:
-        setSleepVar(False)
+        set_sleep_var(False)
         end_time =  datetime.datetime.now()
         logger.info("Time for TREE: " + str(end_time - start_time))
 
 
-def merge_aci_appd(tenant, appDId, aci_local_object):
+def merge_aci_appd(tenant, appDId, aci_util_obj):
     """
     Merge Aci data with App dynamics data fetched from DB
     """
     start_time = datetime.datetime.now()
     logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
     try:
-        aci_data = aci_local_object.main()
+        aci_data = aci_util_obj.main()
 
-        # To run anywhere other than on the APIC
-        # aci_login = aci_object.apic_login()
-        # aci_data = aci_object.main(tenant)
-        # aci_object = aci_local.ACI("192.168.130.10", "admin", "Cisco!123")
-        # aci_object = aci_local.ACI("10.23.239.23", "admin", "cisco123")
-        # aci_data = aci_object.main(tenant)
-        
         merge_list = []
         merged_eps = []
         total_epg_count = {}
@@ -1040,8 +1020,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
         non_merged_ep_dict = {}
 
         appId = str(appDId) + str(tenant)
-        mappings = database_object.returnMapping(appId)
-        mappings = [node for node in mappings if node.get('disabled') == False]
+        mappings = database_object.return_mapping(appId)
 
         logger.debug("ACI Data: {}".format(str(aci_data)))
         logger.debug("Mapping Data: {}".format(str(mappings)))
@@ -1053,6 +1032,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 total_epg_count[aci['EPG']] += 1
 
             if mappings:
+                mappings = [node for node in mappings if node.get('disabled') == False]
                 for each in mappings:
                     # Check with IP or Mac 
                     mapping_key = 'ipaddress'
@@ -1063,7 +1043,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                     
                     if aci[aci_key] == each[mapping_key] and each['domainName'] == str(aci['dn']):
                         # Change based on IP and Mac
-                        appd_data = getappD(appDId, aci[aci_key])
+                        appd_data = get_appD(appDId, aci[aci_key])
                         if appd_data:
                             for each in appd_data:
                                 each.update(aci)
@@ -1076,8 +1056,11 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                                         merged_epg_count[aci['EPG']] = [aci[aci_key]]
                                     else:
                                         merged_epg_count[aci['EPG']].append(aci[aci_key])
+
         for aci in aci_data:
-            if aci['IP'] not in merged_eps and aci['CEP-Mac'] not in merged_eps:
+            if aci['IP'] in merged_eps or aci['CEP-Mac'] in merged_eps:
+                continue
+            else:
                 if aci['EPG'] not in non_merged_ep_dict:
                     non_merged_ep_dict[aci['EPG']] = {aci['CEP-Mac']: str(aci['IP'])}
                 else:
@@ -1104,7 +1087,7 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
                 #fractions[epg] = str(len(merged_epg_count.get(epg, [])))+"/"+str(total_epg_count.get(epg, []))
                 un_map_eps = int(total_epg_count.get(epg, [])) - len(merged_epg_count.get(epg, []))
                 fractions[epg] = int(un_map_eps)
-                logger.info('Total Unmapped Eps (Inactive):'+str(un_map_eps))
+                logger.info('Total Unmapped Eps (Inactive):'+str(un_map_eps)+" - "+str(epg))
 
         updated_merged_list = []
         if fractions:
@@ -1132,29 +1115,26 @@ def merge_aci_appd(tenant, appDId, aci_local_object):
         logger.info("Time for merge_aci_appd: " + str(end_time - start_time))
 
 
-def getappD(appId, ep):
+def get_appD(appId, ep):
     """
     Get application data from App dynamics for given application Id
     """
     start_time = datetime.datetime.now()
     try:
-        app = database_object.returnApplication('appId', appId)
-        tiers = database_object.returnTiers('appId', appId)
-        # TODO: Check its use and remove this line
-        hevs = database_object.returnHealthViolations('appId', appId)
-        
+        app = database_object.return_application('appId', appId)
+        tiers = database_object.return_tiers('appId', appId)
         appd_list = []
 
         for application in app:
-            hev = database_object.returnHealthViolations('appId', application.appId)
+            hev = database_object.return_health_violations('appId', application.appId)
             for tier in tiers:
-                seps = database_object.returnServiceEndpoints('tierId', tier.tierId)
+                seps = database_object.return_service_endpoints('tierId', tier.tierId)
                 sepList = []
                 for sep in seps:
                     if isinstance(sep.sep, dict):
                         sepList.append(sep.sep)
                 hevList = []
-                hevs = database_object.returnHealthViolations('tierId', tier.tierId)
+                hevs = database_object.return_health_violations('tierId', tier.tierId)
                 for hev in hevs:
                     if (int(hev.violationId) >= 0):
                         hevList.append(
@@ -1169,7 +1149,7 @@ def getappD(appId, ep):
                                 'Evaluation States': hev.evaluationStates["evaluationStates"]
                             }
                         )
-                nodes = database_object.returnNodes('tierId', tier.tierId)
+                nodes = database_object.return_nodes('tierId', tier.tierId)
                 for node in nodes:
                     if ep in node.ipAddress:
                         appd_list.append(
@@ -1207,57 +1187,54 @@ def getappD(appId, ep):
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
     finally:
         end_time =  datetime.datetime.now()
-        logger.info("Time for getappD: " + str(end_time - start_time))
+        logger.info("Time for get_appD: " + str(end_time - start_time))
 
 
 @app.route('/details.json')  # Will take tenantname and appId as arguments
 def get_details(tenant, appId):
     try:
         start_time = datetime.datetime.now()
-        #time.sleep(1)
         logger.info("UI Action details.json started")
         
-        setSleepVar(True)
-
-        # To run on APIC
-        aci_local_object = aci_local.ACI_Local(tenant)
-        # To run anywhere other than APIC
-        # aci_local_object = aci_local.ACI("192.168.130.10", "admin", "Cisco!123")
+        set_sleep_var(True)
+        aci_util_obj = aci_utils.ACI_Utils(tenant)
 
         details_list = []
-        merged_data = merge_aci_appd(tenant, appId, aci_local_object)
-        #getToEpgTraffic("uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-Ord")
+        merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
+        #get_to_Epg_traffic("uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-Ord")
 
         for each in merged_data:
-            epg_health = aci_local_object.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
+            epg_health = aci_util_obj.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
             node = get_node_from_interface(each['Interfaces'])
             interfaces = get_all_interfaces(each['Interfaces']) 
             details_list.append({
-                    'IP': each['IP'],
-                    'epgName': each['EPG'],
+                    'IP': each.get('IP'),
+                    'epgName': each.get('EPG'),
                     'epgHealth': epg_health,
-                    'endPointName': each['VM-Name'],
-                    'tierName': each['tierName'],
-                    'tierHealth': each['tierHealth'],
-                    'dn': each['dn'],
-                    'mac': each['CEP-Mac'],
+                    'endPointName': each.get('VM-Name'),
+                    'tierName': each.get('tierName'),
+                    'tierHealth': each.get('tierHealth'),
+                    'dn': each.get('dn'),
+                    'mac': each.get('CEP-Mac'),
                     'interface': str(interfaces),
                     'node': str(node)
                 })
         logger.info("UI Action details.json ended")
         details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
-        return json.dumps({"instanceName":getInstanceName(),"payload": details, "status_code": "200", "message": "OK"})
+        return json.dumps({"instanceName":get_instance_name(),"payload": details, "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not load the Details. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Details. Error: "+str(e)})
     finally:
-        setSleepVar(False)
+        set_sleep_var(False)
         end_time =  datetime.datetime.now()
         logger.info("Time for GET_DETAILS: " + str(end_time - start_time))
 
 
 def get_node_from_interface(interfaces):
-    """This function extracts the node number from interface"""
+    """
+    This function extracts the node number from interface
+    """
     node_number = ''
     if isinstance(interfaces, list):
         node_number = ''

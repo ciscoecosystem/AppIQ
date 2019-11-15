@@ -2,12 +2,10 @@ __author__ = 'nilayshah'
 
 import requests
 import json, time, os
-from pprint import pprint
-import AppD_Alchemy as AppD_Database
-import ACI_Local as aci_local
+import alchemy as database
 import datetime
 import threading
-from flask import current_app
+import urls
 from custom_logger import CustomLogger
 
 logger = CustomLogger.get_logger("/home/app/log/app.log")
@@ -20,12 +18,11 @@ class AppD(object):
         self.password = password
 
         self.appd_session = requests.Session()
-        # self.protocol = "https://"  # Check for connection if not try http
-        self.login_url = self.host + ':' + self.port + '/controller/auth?action=login'
+        self.login_url = urls.APPD_LOGIN_URL.format(self.host, self.port)
         try:
             login_status = self.check_connection()
             logger.info('App Login Status:'+str(login_status))
-            if str(login_status) != '200':# and str(login_status) != '201':
+            if login_status != 200: # and str(login_status) != '201':
                 logger.warning('Initial connection to AppDynamics failed!')
                 if 'https://' in self.host:
                     logger.info('Trying http instead...')
@@ -33,24 +30,27 @@ class AppD(object):
                 elif 'http://' in self.host:
                     logger.info('Trying https instead...')
                     self.host = self.host.replace('http','https')
-                self.login_url = self.host + ':' + self.port + '/controller/auth?action=login'
+                self.login_url = urls.APPD_LOGIN_URL.format(self.host, self.port)
                 self.check_connection()
-            self.databaseObject = AppD_Database.Database()
+            self.databaseObject = database.Database()
             logger.info('AppD Database schema generated.')
         except:
             logger.exception('AppD Connection Failure. Please check that the AppDynamics Controller is available with valid credentials')
 
 
     def check_connection(self):
+        """
+        Check connection using username and password.
+        """
         start_time = datetime.datetime.now()
-        logger.info('In check_connection')
+        logger.info('check_connection execution starts...')
         try:
             self.appd_session.auth = (self.user, self.password)
             login = self.appd_session.get(self.login_url,timeout=10)
-            logger.info('login in check connection: ' + str(login))
+            logger.debug('login in check connection: ' + str(login))
             if login.status_code == 200 or login.status_code == 201:
                 logger.info('Connection to AppDynamics Successful!')
-                logger.info('login.cookies: ' + str(login.cookies))
+                logger.debug('login.cookies: ' + str(login.cookies))
                 self.token = login.cookies['X-CSRF-TOKEN']
                 # The response of get returns the JSESSSIONID only first time.
                 if login.cookies.get('JSESSIONID'):
@@ -64,14 +64,17 @@ class AppD(object):
                 return login.status_code
         except Exception as e:
             logger.exception('Connection to AppDynamics Failed! Error:' + str(e))
-            return "404"
+            return 404
         finally:
             # self.appd_session.close()
             end_time =  datetime.datetime.now()
             logger.info("Time for check_connection: " + str(end_time - start_time))
             
 
-    def get_app_health(self, id):
+    def get_app_health(self, id, retry = 1):
+        """
+        Get application health for given id.
+        """
         start_time = datetime.datetime.now()
         payload = {
             "requestFilter": [id],
@@ -82,30 +85,17 @@ class AppD(object):
             "timeRangeEnd": int(round(time.time() * 1000))
         }
         try:
-            apps_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/app/list/ids",
+            apps_health = self.appd_session.post(urls.APP_HEALTH_URL.format(self.host, self.port),
                                                  headers=self.headers, data=json.dumps(payload))
             if apps_health.status_code == 404:
-                apps_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/app/list/ids",
+                apps_health = self.appd_session.post(urls.APP_HEALTH_URL_V1.format(self.host, self.port),
                                                  headers=self.headers, data=json.dumps(payload))
             if apps_health.status_code == 200:
-                return apps_health.json()  # ['data'][0]['severitySummary']['performanceState']
+                return apps_health.json()
             else:
-                # Refresh
-                self.check_connection()
-                try:
-                    apps_health = self.appd_session.post(
-                        self.host + ":" + self.port + "/controller/restui/app/list/ids",
-                        headers=self.headers, data=json.dumps(payload))
-                    if apps_health.status_code == 404:
-                        apps_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/app/list/ids",
-                                                 headers=self.headers, data=json.dumps(payload))
-                    if apps_health.status_code == 200:
-                        return apps_health.json()
-                    else:
-                        return ""
-                except Exception as e:
-                    logger.exception('Error Fetching AppD apps health, ' + str(e))
-                    return ""
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_app_health(id, retry = 2)
         except Exception as e:
             logger.exception('Error Fetching AppD apps health, ' + str(e))
             return ""
@@ -114,7 +104,10 @@ class AppD(object):
             logger.info("Time for get_app_health: " + str(end_time - start_time))
 
 
-    def get_tier_health(self, id):
+    def get_tier_health(self, id, retry = 1):
+        """
+        Get tier health for given id.
+        """
         start_time = datetime.datetime.now()
         payload = {
             "requestFilter": [id],
@@ -126,17 +119,18 @@ class AppD(object):
         }
         try:
             tiers_health = self.appd_session.post(
-                self.host + ":" + self.port + "/controller/restui/tiers/list/health/ids",
+                urls.TIER_HEALTH_URL.format(self.host, self.port),
                 headers=self.headers,
                 data=json.dumps(payload))
             if tiers_health.status_code == 404:
-                tiers_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/tiers/list/health/ids",
+                tiers_health = self.appd_session.post(urls.TIER_HEALTH_URL_V1.format(self.host, self.port),
                                                  headers=self.headers, data=json.dumps(payload))
             if tiers_health.status_code == 200:
-                if 'data' in tiers_health.json():
-                    if 'healthMetricStats' in tiers_health.json()['data'][0]:
-                        if 'state' in tiers_health.json()['data'][0]['healthMetricStats']:
-                            return tiers_health.json()['data'][0]['healthMetricStats']['state']
+                tiers_health_json = tiers_health.json()
+                if 'data' in tiers_health_json:
+                    if 'healthMetricStats' in tiers_health_json['data'][0]:
+                        if 'state' in tiers_health_json['data'][0]['healthMetricStats']:
+                            return tiers_health_json['data'][0]['healthMetricStats']['state']
                         else:
                             return 'UNDEFINED'
                     else:
@@ -144,31 +138,9 @@ class AppD(object):
                 else:
                     return 'UNDEFINED'
             else:
-                # Refresh
-                self.check_connection()
-                try:
-                    tiers_health = self.appd_session.post(
-                        self.host + ":" + self.port + "/controller/restui/tiers/list/health/ids", headers=self.headers,
-                        data=json.dumps(payload))
-                    if tiers_health.status_code == 404:
-                        tiers_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/tiers/list/health/ids",
-                                                 headers=self.headers, data=json.dumps(payload))
-                    if tiers_health.status_code == 200:
-                        if 'data' in tiers_health.json():
-                            if 'healthMetricStats' in tiers_health.json()['data'][0]:
-                                if 'state' in tiers_health.json()['data'][0]['healthMetricStats']:
-                                    return tiers_health.json()['data'][0]['healthMetricStats']['state']
-                                else:
-                                    return 'UNDEFINED'
-                            else:
-                                return 'UNDEFINED'
-                        else:
-                            return 'UNDEFINED'
-                    else:
-                        return 'UNDEFINED'
-                except Exception as e:
-                    logger.exception('Error Fetching AppD tiers health, ' + str(e))
-                    return "UNDEFINED"
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_tier_health(id, retry = 2)
         except Exception as e:
             logger.exception('Error Fetching AppD tiers health, ' + str(e))
             return "UNDEFINED"
@@ -177,7 +149,10 @@ class AppD(object):
             logger.info("Time for get_tier_health: " + str(end_time - start_time))
 
 
-    def get_node_health(self, id):
+    def get_node_health(self, id, retry = 1):
+        """
+        Get node health for given id.
+        """
         start_time = datetime.datetime.now()
         payload = {
             "requestFilter": [id],
@@ -189,11 +164,11 @@ class AppD(object):
         }
         try:
             nodes_health = self.appd_session.post(
-                self.host + ":" + self.port + "/controller/restui/nodes/list/health/ids",
+                urls.NODE_HEALTH_URL.format(self.host, self.port),
                 headers=self.headers,
                 data=json.dumps(payload))
             if nodes_health.status_code == 404:
-                nodes_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/nodes/list/health/ids",
+                nodes_health = self.appd_session.post(urls.NODE_HEALTH_URL_V1.format(self.host, self.port),
                                                  headers=self.headers, data=json.dumps(payload))
             if nodes_health.status_code == 200:
                 if 'data' in nodes_health.json():
@@ -208,30 +183,10 @@ class AppD(object):
                     return 'UNDEFINED'
             else:
                 # Refresh
-                self.check_connection()
-                try:
-                    nodes_health = self.appd_session.post(
-                        self.host + ":" + self.port + "/controller/restui/nodes/list/health/ids", headers=self.headers,
-                        data=json.dumps(payload))
-                    if nodes_health.status_code == 404:
-                        nodes_health = self.appd_session.post(self.host + ":" + self.port + "/controller/restui/v1/nodes/list/health/ids",
-                                                 headers=self.headers, data=json.dumps(payload))
-                    if nodes_health.status_code == 200:
-                        if 'data' in nodes_health.json():
-                            if 'healthMetricStats' in nodes_health.json()['data'][0]:
-                                if 'state' in nodes_health.json()['data'][0]['healthMetricStats']:
-                                    return nodes_health.json()['data'][0]['healthMetricStats']['state']
-                                else:
-                                    return 'UNDEFINED'
-                            else:
-                                return 'UNDEFINED'
-                        else:
-                            return 'UNDEFINED'
-                    else:
-                        return 'UNDEFINED'
-                except Exception as e:
-                    logger.exception('Error Fetching AppD nodes health, ' + str(e))
-                    return "UNDEFINED"
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_node_health(id, retry = 2)
+                
         except Exception as e:
             logger.exception('Error Fetching AppD nodes health, ' + str(e))
             return "UNDEFINED"
@@ -242,9 +197,7 @@ class AppD(object):
 
     def get_service_endpoints(self, app_id, tier_id):
         start_time = datetime.datetime.now()
-        url = self.host + ':' + self.port + '/controller/restui/serviceEndpoint/listViewData/' + str(
-            app_id) + '/' + str(
-            tier_id) + '?time-range=last_5_minnutes.BEFORE_NOW.-1.-1.5'
+        url = urls.SERVICE_ENDPOINTS_URL.format(self.host, self.port, str(app_id), str(tier_id))
         try:
             service_endpoints = self.appd_session.get(url, headers=self.headers)
             # if session expired Exception occurs - refresh and try the method again
@@ -258,7 +211,6 @@ class AppD(object):
             if service_endpoints.status_code == 200:
                 if not service_endpoints:
                     return []
-                # logger.info('AppD Service Endpoints fetched for AppId' + str(app_id))
                 if 'serviceEndpointListEntries' in service_endpoints.json():
                     service_endpoints = service_endpoints.json()['serviceEndpointListEntries']
                 else:
@@ -266,44 +218,41 @@ class AppD(object):
                 service_endpoints_list = []
                 if service_endpoints:
                     for sep in service_endpoints:
-                        if 'performanceSummary' in sep:
-                            if 'type' in sep:
-                                if sep.get('performanceSummary') and str(sep.get('type')) == "SERVLET":
-                                    sepId = sep.get('id')
-                                    sepName = sep.get('name')
-                                    if 'performanceStats' in sep.get('performanceSummary'):
-                                        if 'errorPercentage' in sep.get('performanceSummary').get('performanceStats'):
-                                            errorP = sep.get('performanceSummary').get('performanceStats').get(
-                                                'errorPercentage')
-                                        else:
-                                            errorP = '0'
-                                        if 'numberOfErrors' in sep.get('performanceSummary').get('performanceStats'):
-                                            if 'value' in sep.get('performanceSummary').get('performanceStats'):
-                                                errorCount = sep.get('performanceSummary').get('performanceStats').get(
-                                                    'numberOfErrors').get('value')
-                                            else:
-                                                errorCount = '0'
+                        if 'performanceSummary' in sep and 'type' in sep:
+                            if sep.get('performanceSummary') and str(sep.get('type')) == "SERVLET":
+                                sepId = sep.get('id')
+                                sepName = sep.get('name')
+                                performance_summary = sep.get('performanceSummary')
+                                if performance_summary.get('performanceStats'):
+                                    performance_stats = performance_summary.get('performanceStats')
+                                    if performance_stats.get('errorPercentage'):
+                                        errorP = performance_stats.get('errorPercentage')
+                                    else:
+                                        errorP = '0'
+                                    if performance_stats.get('numberOfErrors'):
+                                        if performance_stats.get('numberOfErrors').get('value'):
+                                            errorCount = performance_stats.get('numberOfErrors').get('value')
                                         else:
                                             errorCount = '0'
-                                        if 'errorsPerMinute' in sep.get('performanceSummary').get('performanceStats'):
-                                            if 'value' in sep.get('performanceSummary').get('performanceStats').get(
-                                                    'errorsPerMinute'):
-                                                errorPMin = sep.get('performanceSummary').get('performanceStats').get(
-                                                    'errorsPerMinute').get('value')
-                                            else:
-                                                errorCount = '0'
+                                    else:
+                                        errorCount = '0'
+                                    if performance_stats.get('errorsPerMinute'):
+                                        if performance_stats.get('errorsPerMinute').get('value'):
+                                            errorPMin = performance_stats.get('errorsPerMinute').get('value')
                                         else:
-                                            errorCount = '0'
-                                        if str(errorPMin) == "-1":
                                             errorPMin = '0'
-                                        if str(errorCount) == "-1":
-                                            errorCount = '0'
-                                        sepType = sep.get('type')
-                                        service_endpoints_list.append(
-                                           {'sepId': sepId, 'sepName': str(sepName), 'Error Percentage': str(errorP),
-                                             'Total Errors': str(errorCount),
-                                             'Errors/Min': str(errorPMin),
-                                             'Type': str(sepType)})
+                                    else:
+                                        errorPMin = '0'
+                                    if str(errorPMin) == "-1":
+                                        errorPMin = '0'
+                                    if str(errorCount) == "-1":
+                                        errorCount = '0'
+                                    sepType = sep.get('type')
+                                    service_endpoints_list.append(
+                                        {'sepId': sepId, 'sepName': str(sepName), 'Error Percentage': str(errorP),
+                                            'Total Errors': str(errorCount),
+                                            'Errors/Min': str(errorPMin),
+                                            'Type': str(sepType)})
                     return service_endpoints_list
         except Exception as e:
             logger.exception('Service EP API call failed,  ' + str(e))
@@ -313,53 +262,43 @@ class AppD(object):
             logger.info("Time for get_service_endpoints: " + str(end_time - start_time))
 
 
-    def get_node_mac(self, node_id):
+    def get_node_mac(self, node_id, retry = 1):
         """
         Return mac addresses as array for given node Id.
         """
         mac = []
         try:
-            self.check_connection()
             # Non documented API call to fetch mac for given node
             node_mac_details_response = self.appd_session.get(
-                str(self.host)+':'+ self.port + '/controller/sim/v2/user/machines?'+'nodeIds=' + str(
-                    node_id) + '&output=JSON', auth=(self.user, self.password))
+                urls.NODE_MAC_URL.format(self.host, self.port, str(node_id)) , auth=(self.user, self.password))
             if node_mac_details_response.status_code == 200:
                 logger.info('Fetched mac for Nodes ' + str(node_id))
                 if node_mac_details_response.json():
                     for all_data in node_mac_details_response.json():
                         for interface in all_data.get('networkInterfaces'):
                             mac.append(str(interface['macAddress']))
+            else:
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_node_mac(node_id, 2)
         except Exception as e:
             logger.exception("error occured while getting mac for node : "+str(e))
         return mac
 
-    def get_app_info(self):
+    def get_app_info(self, retry = 1):
+        """
+        Returns all application details.
+        """
         start_time = datetime.datetime.now()
         try:
-            # self.appd_session
-            applications = self.appd_session.get(self.host + ':' + self.port + '/controller/rest/applications' + '?output=JSON',
+            applications = self.appd_session.get(urls.APP_INFO_URL.format(self.host, self.port),
                                         auth=(self.user, self.password))
-            # logger.info('app code -'+str(applications.status_code))
             if applications.status_code == 200:
-                # logger.info('Fetched AppD applications.')
                 return applications.json()
             else:
-                # Refresh
-                self.check_connection()
-                try:
-                    # self.appd_session
-                    applications = self.appd_session.get(
-                        self.host + ':' + self.port + '/controller/rest/applications' + '?output=JSON',
-                        auth=(self.user, self.password))
-                    if applications.status_code == 200:
-                        # logger.info('Fetched AppD applications.')
-                        return applications.json()
-                    else:
-                        return []
-                except Exception as e:
-                    logger.exception('Apps API call failed,  ' + str(e))
-                    return []
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_app_info(retry = 2)
         except Exception as e:
             logger.exception('Apps API call failed,  ' + str(e))
             return []
@@ -367,33 +306,20 @@ class AppD(object):
             end_time =  datetime.datetime.now()
             logger.info("Time for get_app_info: " + str(end_time - start_time))
 
-    def get_tier_info(self, app_id):
+    def get_tier_info(self, app_id, retry = 1):
+        """
+        Returns all tier info of given application Id.
+        """
         start_time = datetime.datetime.now()
         try:
-            # self.appd_session
-            tiers_response = self.appd_session.get(str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(
-                app_id) + '/tiers?output=JSON',
+            tiers_response = self.appd_session.get(urls.TIER_INFO_URL.format(self.host, self.port, str(app_id)),
                                           auth=(self.user, self.password))
-            # logger.info('tier code -'+str(tiers_response.status_code))
             if tiers_response.status_code == 200:
-                # logger.info('Fetched Tiers for AppID - ' + str(app_id))
                 return tiers_response.json()
             else:
-                # Refresh
-                self.check_connection()
-                try:
-                    # self.appd_session
-                    tiers_response = self.appd_session.get(
-                        str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(
-                            app_id) + '/tiers?output=JSON', auth=(self.user, self.password))
-                    if tiers_response.status_code == 200:
-                        # logger.info('Fetched Tiers for AppID - ' + str(app_id))
-                        return tiers_response.json()
-                    else:
-                        return []
-                except Exception as e:
-                    logger.exception('Tiers API call failed,  ' + str(e))
-                    return []
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_tier_info(app_id, retry = 2)
         except Exception as e:
             logger.exception('Tiers API call failed,  ' + str(e))
             return []
@@ -402,40 +328,23 @@ class AppD(object):
             logger.info("Time for get_tier_info: " + str(end_time - start_time))
 
 
-    def get_node_info(self, app_id, tier_id):
+    def get_node_info(self, app_id, tier_id, retry = 1):
+        """
+        Returns all node info of given application Id and tier Id.
+        """
         start_time = datetime.datetime.now()
         try:
-            # self.appd_session
             nodes_response = self.appd_session.get(
-                str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(app_id) + '/tiers/' + str(
-                    tier_id) + '/nodes?output=JSON', auth=(self.user, self.password))
-            # logger.info('node code -'+str(nodes_response.status_code))
+                urls.NODE_INFO_URL.format(self.host, self.port, app_id, tier_id), auth=(self.user, self.password))
             if nodes_response.status_code == 200:
-                #logger.info('Fetched AppD Nodes for Tier -' + str(tier_id) + ', App - ' + str(app_id))
                 if nodes_response.json():
                     return nodes_response.json()
                 else:
                     return []
             else:
-                # Refresh
-                self.check_connection()
-                try:
-                    # self.appd_session
-                    nodes_response = self.appd_session.get(
-                        str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(
-                            app_id) + '/tiers/' + str(tier_id) + '/nodes?output=JSON', auth=(self.user, self.password))
-                    if nodes_response.status_code == 200:
-                        # logger.info(
-                        #    'Fetched AppD Nodes for Tier -' + str(tier_id) + ', App - ' + str(app_id))
-                        if nodes_response.json():
-                            return nodes_response.json()
-                        else:
-                            return []
-                    else:
-                        return []
-                except Exception as e:
-                    logger.exception('Nodes API call failed,  ' + str(e))
-                    return []
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_node_info(app_id, tier_id, retry = 2)
         except Exception as e:
             logger.exception('Nodes API call failed,  ' + str(e))
             return []
@@ -443,22 +352,23 @@ class AppD(object):
             end_time =  datetime.datetime.now()
             logger.info("Time for get_node_info: " + str(end_time - start_time))
 
-    def getHealthViolations(self, app_id, tier_id=None, node_id=None):
+
+    def get_health_violations(self, app_id, tier_id=None, node_id=None):
         start_time = datetime.datetime.now()
-        healthV_url = self.host + ':' + self.port + '/controller/restui/incidents/application/' + str(app_id)
+        url = urls.HEALTH_VIOLATIONS_URL.format(self.host, self.port, str(app_id))
         payload = {"healthRuleIdFilter": -1,
                    "rangeSpecifier": {"type": "BEFORE_NOW", "durationInMinutes": 5}, "pageSize": -1, "pageNumber": 0}
         final_violate_list = []
         violate_list = []
         try:
-            health_violations = self.appd_session.post(healthV_url, headers={'x-csrf-token': self.token,
+            health_violations = self.appd_session.post(url, headers={'x-csrf-token': self.token,
                                                                              'jsessionid': self.JSessionId,
                                                                              'content-type': 'application/json'},
                                                        data=json.dumps(payload))
             if tier_id and str(health_violations.status_code) != "200":
                 self.check_connection()
                 try:
-                    health_violations = self.appd_session.post(healthV_url, headers={'x-csrf-token': self.token,
+                    health_violations = self.appd_session.post(url, headers={'x-csrf-token': self.token,
                                                                                      'jsessionid': self.JSessionId,
                                                                                      'content-type': 'application/json'},
                                                                data=json.dumps(payload))
@@ -484,11 +394,10 @@ class AppD(object):
                     for key2 in health_violations.get('incidents'):
                         for key3 in violate_list:
                             if str(key2['status']) == "OPEN" and str(key2.get('affectedEntity').get('entityId')) in \
-                                    key3[
-                                        'id']:
+                                    key3['id']:
                                 violation_startTime = key2['startTime']
 
-                                startTime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(str(violation_startTime)) / 1000))
+                                start_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(int(str(violation_startTime)) / 1000))
                                 
                                 violation_end_time = int(str(key2['endTime']))
                                 
@@ -525,7 +434,7 @@ class AppD(object):
                                         'Severity': str(severity),
                                         'Violation Id': int(key3['id']),
                                         'Affected Object': key3['bt'],
-                                        'Start Time': str(startTime),
+                                        'Start Time': str(start_time),
                                         'End Time': str(end_time),
                                         'Status': status,
                                         "Evaluation States": eval_states_list
@@ -537,13 +446,10 @@ class AppD(object):
         except Exception as e:
             logger.exception('HEV API call failed,  ' + str(e))
             return []
-        finally:
-            end_time =  datetime.datetime.now()
-            logger.info("Time for getHealthViolations: " + str(end_time - start_time))
 
 
     def getAppDApps(self):
-        apps = self.databaseObject.returnValues('Application')
+        apps = self.databaseObject.return_values('Application')
         list_of_apps = []
         for each in apps:
             app_data = {'appProfileName': str(each.appName), 'isViewEnabled': each.isViewEnabled}
@@ -551,32 +457,20 @@ class AppD(object):
         return {'app': list_of_apps}
 
 
-    def get_node_details(self, appId, nodeId):
+    def get_node_details(self, appId, nodeId, retry = 1):
         start_time = datetime.datetime.now()
         try:
-            # self.appd_session
             node_details_response = self.appd_session.get(
-                str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(appId) + '/nodes/' + str(
-                    nodeId) + '?output=JSON', auth=(self.user, self.password))
+                urls.NODE_DETAILS_URL.format(self.host, self.port, str(appId), str(nodeId)), auth=(self.user, self.password))
             if node_details_response.status_code == 200:
                 if node_details_response.json():
                     return node_details_response.json()
                 else:
                     return []
             else:
-                # Refresh
-                self.check_connection()
-                # self.appd_session
-                node_details_response = self.appd_session.get(
-                    str(self.host) + ':' + self.port + '/controller/rest/applications/' + str(appId) + '/nodes/' + str(
-                        nodeId) + '?output=JSON', auth=(self.user, self.password))
-                if node_details_response.status_code == 200:
-                    if node_details_response.json():
-                        return node_details_response.json()
-                    else:
-                        return []
-                else:
-                    return []
+                if retry == 1:
+                    self.check_connection()
+                    return self.get_node_details(appId, nodeId, retry = 2)
         except Exception as ex:
             logger.exception('Failed to get Node Details for NodeID: ' + nodeId + ' in Application with AppID: ' + appId + '\nException: ' + str(ex))
             return []
@@ -592,44 +486,26 @@ class AppD(object):
 
 
     def get_config_data(self, data_key):
+        """
+        Get value for given key from credentials.json
+        """
         start_time = datetime.datetime.now()
         path = "/home/app/data/credentials.json"
+        data_value = ""
         try:
             if os.path.isfile(path):
                 with open(path, "r") as creds:
                     config_data = json.load(creds)
                     data_value = config_data[data_key]
-                    return data_value
         except KeyError as key_err:
             logger.error("Could not find " + data_key + " in Configuration File" + str(key_err))
-            return ""
         except Exception as err:
             logger.error("Exception while fetching data from Configuration file " + str(err))
-            return ""
         finally:
             end_time =  datetime.datetime.now()
             logger.info("Time for get_config_data: " + str(end_time - start_time))
+        return data_value        
 
-    def check_and_wait_till_locked(self):
-        while True:
-            path = "/home/app/data/SleepVar.json"
-            try:
-                if os.path.isfile(path):
-                    with open(path, "r") as creds:
-                        config_data = json.load(creds)
-                        logger.debug("Sleep arg "+ config_data["sleep_var"])
-                        if config_data["sleep_var"] == '1':
-                            logger.debug("API calls to APIC locked since UI action is invoked. Would retry after 5 seconds")
-                            time.sleep(5)
-                            continue
-                        else:
-                            return
-                else:
-                    logger.error("Could not find SleepVar File")
-            except Exception as err:
-                err_msg = "Exception while reading sleep_var : " + str(err)
-                logger.exception("{}".format(err_msg))
-        
 
     def main(self):
         while True:
@@ -637,9 +513,9 @@ class AppD(object):
             start_time = datetime.datetime.now()
             timeStamp = datetime.datetime.utcnow()
 
-            self.databaseObject = AppD_Database.Database()
+            self.databaseObject = database.Database()
             self.check_connection()
-            logger.info('===Starting Database Update!')
+            logger.debug('Starting Database Update in main thread!')
             
             try:
                 apps = self.get_app_info()
@@ -649,7 +525,7 @@ class AppD(object):
             appidList = []
             tieridList = []
             nodeidlist = []
-            sepList = []
+            sepidList = []
             violationList = []
             
             try:
@@ -657,7 +533,7 @@ class AppD(object):
                     for app in apps:
                         app_metrics = self.get_app_health(app.get('id'))
                         appidList.append(app.get('id'))
-                        self.databaseObject.checkIfExistsandUpdate('Application',
+                        self.databaseObject.check_if_exists_and_update('Application',
                                                                    [app.get('id'), str(app.get('name')), app_metrics, timeStamp])
                     for app in apps:
                         tiers = self.get_tier_info(app.get('id'))
@@ -668,35 +544,29 @@ class AppD(object):
                                     #continue
                                     tieridList.append(tier.get('id'))
                                     # tierId, tierName, appId, tierHealth
-                                    self.databaseObject.checkIfExistsandUpdate('Tiers',
+                                    self.databaseObject.check_if_exists_and_update('Tiers',
                                                                                [tier.get('id'), str(tier.get('name')),
                                                                                 app.get('id'),
                                                                                 str(tier_health)])
 
-                                # logger.info('Updated Tiers: Total - ' + str(len(tiers)))
                             for tier in tiers:
                                 tier_health = self.get_tier_health(tier.get('id'))
                                 if tier_health != 'UNDEFINED':
-                                    #logger.info('Tier health:' + str(tier_health))
-                                    #continue
-                                    # Service Endpoints
-                                    #logger.info('Updating SEVs')
                                     service_endpoints = self.get_service_endpoints(app.get('id'), tier.get('id'))
                                     if service_endpoints:
                                         # sepId, sep, tierId
                                         try:
                                             for sep in service_endpoints:
-                                                self.databaseObject.checkIfExistsandUpdate('ServiceEndpoints',
+                                                self.databaseObject.check_if_exists_and_update('ServiceEndpoints',
                                                                                            [sep.get('sepId'), sep,
                                                                                             tier.get('id'),
                                                                                             app.get('id'), timeStamp])
-                                                sepList.append(sep['sepId'])
-                                                # self.databaseObject.commitSession()
+                                                sepidList.append(sep['sepId'])
+                                                # self.databaseObject.commit_session()
                                         except Exception as e:
                                             logger.exception('Exception in SEV, Error:'+str(e))
-                                    #logger.info('Updating HEVs')
-                                    # HealthViolations
-                                    tierViolations = self.getHealthViolations(str(app.get('id')), tier_id=tier.get('id'))
+
+                                    tierViolations = self.get_health_violations(str(app.get('id')), tier_id=tier.get('id'))
                                     if tierViolations:
                                         try:
                                             for violations in tierViolations:
@@ -707,24 +577,20 @@ class AppD(object):
                                                     tier.get('id'), app.get('id'), timeStamp,
                                                     violations.get('End Time'), violations.get('Status'), eval_states_dict
                                                 ]
-                                                self.databaseObject.insertOrUpdate('HealthViolations', violations.get('Violation Id'), violations_list)
+                                                self.databaseObject.insert_or_update('HealthViolations', violations.get('Violation Id'), violations_list)
                                                 violationList.append(violations.get('Violation Id'))
                                         except Exception as e:
                                             logger.exception('Exception in HEV, Error:'+str(e))
-                                    #logger.info('Updated SEPs and HEVs')
 
                                     # Nodes
                                     if tier.get('numberOfNodes') > 0:
                                         nodes = self.get_node_info(app.get('id'), tier.get('id'))
                                         ipList = []
                                         macList = []
-                                        #logger.info(nodes)
                                         if len(nodes) > 0:
                                             for node in nodes:
                                                 node_health = self.get_node_health(node.get('id'))
                                                 if node_health != 'UNDEFINED':
-                                                    #logger.info('Node health:' + str(node_health))
-
                                                     # get mac-address for node
                                                     macList = self.get_node_mac(node.get('id'))
                                                     logger.info("mac list::"+str(macList)+" for node "+str(node.get("id")))
@@ -749,25 +615,27 @@ class AppD(object):
                                                                     ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
                                                                     ipList.append(str(ipv4))
 
-                                                    self.databaseObject.checkIfExistsandUpdate('Nodes',
+                                                    self.databaseObject.check_if_exists_and_update('Nodes',
                                                                                                 [node.get('id'),
                                                                                                 str(node.get('name')),
                                                                                                 tier.get('id'),
                                                                                                 str(node_health),
                                                                                                 ipList, app.get('id'), timeStamp, macList])
                                                     nodeidlist.append(node.get('id'))
+                                                    ipList = []
+                                                    macList = []
                                                     logger.info(
                                                         'Record: App_id - ' + str(app.get('id')) + ', AppName - ' + str(
                                                             app.get('name')) + ', Tier - ' + str(
                                                             tier.get('id')) + ', Node - ' + str(node.get('id')))
                                                         
-                    self.databaseObject.checkAndDelete('Application', appidList)
-                    self.databaseObject.checkAndDelete('Tiers', tieridList)
-                    self.databaseObject.checkAndDelete('ServiceEndpoints', sepList)
-                    self.databaseObject.checkAndDelete('HealthViolations', violationList)
-                    self.databaseObject.checkAndDelete('Nodes', nodeidlist)
+                    self.databaseObject.check_and_delete('Application', appidList)
+                    self.databaseObject.check_and_delete('Tiers', tieridList)
+                    self.databaseObject.check_and_delete('ServiceEndpoints', sepidList)
+                    self.databaseObject.check_and_delete('HealthViolations', violationList)
+                    self.databaseObject.check_and_delete('Nodes', nodeidlist)
 
-                    self.databaseObject.commitSession()
+                    self.databaseObject.commit_session()
 
                     polling_interval = self.get_config_data("polling_interval")
                     
@@ -784,13 +652,11 @@ class AppD(object):
                     
                     logger.info("===Time for main_thread===" + total_time)
                     logger.info("====polling_interval====" + str(polling_interval))
-                    logger.info('===Database Update Complete!')
-                    
-                    # logger.info(total_time)
+                    logger.debug('===Database Update Complete!')
                     
                     time.sleep(polling_interval)  # threading.Timer(60, self.main).start()
             except Exception as e:
                 logger.exception('Exception in AppDInfoData Main, Error: ' + str(e))
-                self.databaseObject.commitSession()
+                self.databaseObject.commit_session()
                 time.sleep(polling_interval)
                 self.main()
