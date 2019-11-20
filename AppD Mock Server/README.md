@@ -5,7 +5,7 @@ This is mock server which contains all the rest endpoint of AppDynamics. For the
 ## How to use this ?
 **Prerequisite:**
 - npm
-- [prism](https://stoplight.io/open-source/ /)
+- [prism](https://stoplight.io/open-source/prism/)
 
 **How to run this server?**
 - run the following command to start prism mock server.
@@ -14,13 +14,15 @@ This is mock server which contains all the rest endpoint of AppDynamics. For the
 - Changes to be done in AppIQ code.
   - open Service/appd_utils.py and make following changes.
   - replace code in check_connection() functions
-    - Actual code:
-      * self.token = login.cookies['X-CSRF-TOKEN']
+```python
+        # Actual Code
+        self.token = login.cookies['X-CSRF-TOKEN']
         if login.cookies.get('JSESSIONID'):
             self.JSessionId = login.cookies['JSESSIONID']
-    - New code:
-      * self.token = "any value"
+        # New Code
+        self.token = "any value"
         self.JSessionId = "any value"
+```
 
 - Install the new bundle after changes, in APIC. In login screen, give details as following:
   - "Appdynamics Controller" - IP of the mock server
