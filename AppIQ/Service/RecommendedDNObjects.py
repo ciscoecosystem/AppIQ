@@ -181,7 +181,7 @@ class Recommend(object):
         """
         logger.info('Finding Correlations for ACI and AppD')
 
-        aci_util_obj = aci_utils.ACI_Utils(tenant)
+        aci_util_obj = aci_utils.ACI_Utils()
         end_points = aci_util_obj.apic_fetchEPData(tenant)
         if not end_points:
             logger.error('Error: Empty end_points ' + str(end_points))

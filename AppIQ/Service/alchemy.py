@@ -2,7 +2,7 @@ __author__ = 'nilayshah'
 
 import datetime
 import time, json
-from sqlalchemy import Column, Integer, String, ForeignKey, PickleType, update, Boolean, func, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, PickleType, update, Boolean, func, DateTime, and_
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import backref, mapper, sessionmaker, relationship
@@ -188,6 +188,7 @@ class ApSummary(Base):
         self.apEpgs = apEpgs
         self.apUsegEpgs = apUsegEpgs
         self.timestamp = timestamp
+
 
 class ACItemp(Base):
     # ACI temp gets all EPs in APIC for all tenants, UI will request based on tenant and get EPs for that tenant
@@ -717,7 +718,7 @@ class Database():
     
     def get_app_by_id(self, id):
         try:
-            app = self.session.query(Application).filter(Application.appId == id).first()
+            app = self.session.query(Application).filter(and_(Application.appId == id, Application.isViewEnabled == True)).first()
             if app:
                 application = {'appId': app.appId, 'appName': str(app.appName),
                                'appHealth': str(app.appMetrics['data'][0]['severitySummary']['performanceState']),
