@@ -32,7 +32,7 @@ class AppD(object):
                     self.host = self.host.replace('http','https')
                 self.login_url = urls.APPD_LOGIN_URL.format(self.host, self.port)
                 self.check_connection()
-            self.databaseObject = database.Database()
+            self.db_object = database.Database()
             logger.info('AppD Database schema generated.')
         except:
             logger.exception('AppD Connection Failure. Please check that the AppDynamics Controller is available with valid credentials')
@@ -59,9 +59,7 @@ class AppD(object):
                    'x-csrf-token': self.token,
                    'content-type': "application/json"
                 }
-                return login.status_code
-            else:
-                return login.status_code
+            return login.status_code
         except Exception as e:
             logger.exception('Connection to AppDynamics Failed! Error:' + str(e))
             return 404
@@ -131,12 +129,7 @@ class AppD(object):
                     if 'healthMetricStats' in tiers_health_json['data'][0]:
                         if 'state' in tiers_health_json['data'][0]['healthMetricStats']:
                             return tiers_health_json['data'][0]['healthMetricStats']['state']
-                        else:
-                            return 'UNDEFINED'
-                    else:
-                        return 'UNDEFINED'
-                else:
-                    return 'UNDEFINED'
+                return 'UNDEFINED'
             else:
                 if retry == 1:
                     self.check_connection()
@@ -175,12 +168,7 @@ class AppD(object):
                     if 'healthMetricStats' in nodes_health.json()['data'][0]:
                         if 'state' in nodes_health.json()['data'][0]['healthMetricStats']:
                             return nodes_health.json()['data'][0]['healthMetricStats']['state']
-                        else:
-                            return 'UNDEFINED'
-                    else:
-                        return 'UNDEFINED'
-                else:
-                    return 'UNDEFINED'
+                return 'UNDEFINED'
             else:
                 # Refresh
                 if retry == 1:
@@ -339,8 +327,7 @@ class AppD(object):
             if nodes_response.status_code == 200:
                 if nodes_response.json():
                     return nodes_response.json()
-                else:
-                    return []
+                return []
             else:
                 if retry == 1:
                     self.check_connection()
@@ -449,7 +436,7 @@ class AppD(object):
 
 
     def getAppDApps(self):
-        apps = self.databaseObject.return_values('Application')
+        apps = self.db_object.return_values('Application')
         list_of_apps = []
         for each in apps:
             app_data = {'appProfileName': str(each.appName), 'isViewEnabled': each.isViewEnabled}
@@ -465,8 +452,7 @@ class AppD(object):
             if node_details_response.status_code == 200:
                 if node_details_response.json():
                     return node_details_response.json()
-                else:
-                    return []
+                return []
             else:
                 if retry == 1:
                     self.check_connection()
@@ -509,11 +495,11 @@ class AppD(object):
 
     def main(self):
         while True:
-            
-            start_time = datetime.datetime.now()
-            timeStamp = datetime.datetime.utcnow()
 
-            self.databaseObject = database.Database()
+            start_time = datetime.datetime.now()
+            time_stamp = datetime.datetime.utcnow()
+
+            self.db_object = database.Database()
             self.check_connection()
             logger.debug('Starting Database Update in main thread!')
             
@@ -533,36 +519,37 @@ class AppD(object):
                     for app in apps:
                         app_metrics = self.get_app_health(app.get('id'))
                         appidList.append(app.get('id'))
-                        self.databaseObject.check_if_exists_and_update('Application',
-                                                                   [app.get('id'), str(app.get('name')), app_metrics, timeStamp])
+                        self.db_object.check_if_exists_and_update('Application',
+                                                                   [app.get('id'), str(app.get('name')), app_metrics, time_stamp])
                     for app in apps:
                         tiers = self.get_tier_info(app.get('id'))
                         if tiers:
+                            tier_health_dict = {}
                             for tier in tiers:
                                 tier_health = self.get_tier_health(tier.get('id'))
+                                tier_health_dict[tier.get('id')] = tier_health
                                 if tier_health != 'UNDEFINED':
                                     #continue
                                     tieridList.append(tier.get('id'))
                                     # tierId, tierName, appId, tierHealth
-                                    self.databaseObject.check_if_exists_and_update('Tiers',
+                                    self.db_object.check_if_exists_and_update('Tiers',
                                                                                [tier.get('id'), str(tier.get('name')),
                                                                                 app.get('id'),
                                                                                 str(tier_health)])
 
                             for tier in tiers:
-                                tier_health = self.get_tier_health(tier.get('id'))
+                                tier_health = tier_health_dict.get(tier.get('id'))
                                 if tier_health != 'UNDEFINED':
                                     service_endpoints = self.get_service_endpoints(app.get('id'), tier.get('id'))
                                     if service_endpoints:
                                         # sepId, sep, tierId
                                         try:
                                             for sep in service_endpoints:
-                                                self.databaseObject.check_if_exists_and_update('ServiceEndpoints',
+                                                self.db_object.check_if_exists_and_update('ServiceEndpoints',
                                                                                            [sep.get('sepId'), sep,
                                                                                             tier.get('id'),
-                                                                                            app.get('id'), timeStamp])
+                                                                                            app.get('id'), time_stamp])
                                                 sepidList.append(sep['sepId'])
-                                                # self.databaseObject.commit_session()
                                         except Exception as e:
                                             logger.exception('Exception in SEV, Error:'+str(e))
 
@@ -574,10 +561,10 @@ class AppD(object):
                                                 violations_list = [
                                                     violations.get('Start Time'), violations.get('Affected Object'),
                                                     violations.get('Description'), violations.get('Severity'),
-                                                    tier.get('id'), app.get('id'), timeStamp,
+                                                    tier.get('id'), app.get('id'), time_stamp,
                                                     violations.get('End Time'), violations.get('Status'), eval_states_dict
                                                 ]
-                                                self.databaseObject.insert_or_update('HealthViolations', violations.get('Violation Id'), violations_list)
+                                                self.db_object.insert_or_update('HealthViolations', violations.get('Violation Id'), violations_list)
                                                 violationList.append(violations.get('Violation Id'))
                                         except Exception as e:
                                             logger.exception('Exception in HEV, Error:'+str(e))
@@ -615,12 +602,12 @@ class AppD(object):
                                                                     ipv4 = node.get('ipAddresses').get('ipAddresses')[i]
                                                                     ipList.append(str(ipv4))
 
-                                                    self.databaseObject.check_if_exists_and_update('Nodes',
+                                                    self.db_object.check_if_exists_and_update('Nodes',
                                                                                                 [node.get('id'),
                                                                                                 str(node.get('name')),
                                                                                                 tier.get('id'),
                                                                                                 str(node_health),
-                                                                                                ipList, app.get('id'), timeStamp, macList])
+                                                                                                ipList, app.get('id'), time_stamp, macList])
                                                     nodeidlist.append(node.get('id'))
                                                     ipList = []
                                                     macList = []
@@ -629,13 +616,13 @@ class AppD(object):
                                                             app.get('name')) + ', Tier - ' + str(
                                                             tier.get('id')) + ', Node - ' + str(node.get('id')))
                                                         
-                    self.databaseObject.check_and_delete('Application', appidList)
-                    self.databaseObject.check_and_delete('Tiers', tieridList)
-                    self.databaseObject.check_and_delete('ServiceEndpoints', sepidList)
-                    self.databaseObject.check_and_delete('HealthViolations', violationList)
-                    self.databaseObject.check_and_delete('Nodes', nodeidlist)
+                    self.db_object.check_and_delete('Application', appidList)
+                    self.db_object.check_and_delete('Tiers', tieridList)
+                    self.db_object.check_and_delete('ServiceEndpoints', sepidList)
+                    self.db_object.check_and_delete('HealthViolations', violationList)
+                    self.db_object.check_and_delete('Nodes', nodeidlist)
 
-                    self.databaseObject.commit_session()
+                    self.db_object.commit_session()
 
                     polling_interval = self.get_config_data("polling_interval")
                     
@@ -657,6 +644,6 @@ class AppD(object):
                     time.sleep(polling_interval)  # threading.Timer(60, self.main).start()
             except Exception as e:
                 logger.exception('Exception in AppDInfoData Main, Error: ' + str(e))
-                self.databaseObject.commit_session()
+                self.db_object.commit_session()
                 time.sleep(polling_interval)
                 self.main()

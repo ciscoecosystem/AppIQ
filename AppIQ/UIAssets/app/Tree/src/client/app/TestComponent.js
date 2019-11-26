@@ -56,26 +56,6 @@ export default class TestComponent extends React.Component {
                     />
 
                 </div >
-                {/* <div className="navigation-panel-bottom">
-                    <div className="x-btn x-box-item x-btn-default-small x-noicon x-btn-noicon x-btn-default-small-noicon"
-                     id="button-3680" style={{margin : "5px", float : "right", border : "1px solid #ff0000"}} >
-                        <em id="button-3680-btnWrap" style={{float : "right", border : "1px solid #00ff00"}}>
-                            <button id="button-3680-btnEl" type="button" className="x-btn-center" hidefocus="true"
-                            role="button" autocomplete="off" style={{float : "right", border : "1px solid #0000ff"}}>
-                                <span id="button-3680-btnInnerEl" className="x-btn-inner" style={{paddingTop : "7px", border : "1px solid #000000"}}>
-                                    Cancel
-                                </span>
-                            </button>
-                        </em>
-                    </div>
-                </div> */}
-
-                {/* <div className="navigation-panel-bottom">
-                <button className="tree-back-button"
-                        onClick={() => {window.location.href = "index.html";}}>
-                    Back
-                </button>
-                </div> */}
 
                 <div className="health-indicators" id="health-indicators">
                     <h4 style={{marginTop : "50px"}}>Health Legend</h4>

@@ -247,46 +247,23 @@ def mapping(tenant, appDId):
 
             # Get new mapping based on recommendation which may have new nodes
             current_mapping = get_mapping_dict_target_cluster(mapped_objects)
-            new_nodes = []
-            is_mapping_changed = False
+            #current mapping -> new mapping between aci and appd
             for new_map in current_mapping:
-                found = False
-                for existing_map in already_mapped_data:
-                    key_1 = 'ipaddress'
-                    key_2 = 'ipaddress'
-                    if 'ipaddress' not in existing_map:
-                        key_1 = 'macaddress'
-                    if 'ipaddress' not in new_map:
-                        key_2 = 'macaddress'
-
+                #already_mapped_data from database right side
+                for each_already_mapped in already_mapped_data:
+                    key = 'ipaddress'
+                    if 'ipaddress' not in each_already_mapped:
+                        key = 'macaddress'
+                        
                     # Find node which is same as based on recommendation
-                    if existing_map.get(key_1) == new_map.get(key_2) and existing_map.get('domainName') == new_map.get('domainName'):
+                    if each_already_mapped.get(key) == new_map.get(key) and each_already_mapped.get('domainName') == new_map.get('domainName'):
                         # If disabled node found in recommended and saved mapping then it should be disabled
-                        if existing_map.get('disabled') == True:
-                            is_mapping_changed = True
+                        if each_already_mapped.get('disabled') == True:
                             new_map['disabled'] = True
-                        found = True
                         break
-                # If node not found in existing mapping, maintain it in different list
-                if not found:
-                    new_nodes.append(new_map)  
 
-            if len(new_nodes) > 0 or is_mapping_changed:
-                # If new node found, generate new mapping and save it in DB
-                database_object.check_if_exists_and_update('Mapping', [appId, current_mapping])
-                mapping_dict['target_cluster'] = [node for node in current_mapping if node.get('disabled') == False]
-            else:
-                mapping_dict['target_cluster'] = [node for node in already_mapped_data if node.get('disabled') == False]
-        else:
-            logger.info("Mapping Empty!")
-            
-            app = database_object.get_app_by_id(appDId)
-            if app:
-                target = get_mapping_dict_target_cluster(mapped_objects)
-                mapping_dict['target_cluster'] = target
-                                    
-                # Put mapping in DB
-                database_object.check_if_exists_and_update('Mapping', [appId, target])
+        database_object.check_if_exists_and_update('Mapping', [appId, current_mapping])
+        mapping_dict['target_cluster'] = [node for node in current_mapping if node.get('disabled') == False]
 
         for new_object in mapped_objects:
             mapping_dict['source_cluster'].append(new_object)
