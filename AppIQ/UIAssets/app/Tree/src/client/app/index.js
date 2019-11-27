@@ -4,7 +4,7 @@ import TestComponent from './TestComponent.js';
 import Header from './Header.js'
 
 var treedata;
-
+var key = 0;
 function getCookieVal(offset) {
     var endstr = document.cookie.indexOf(";", offset);
     if (endstr == -1) {
@@ -117,6 +117,8 @@ function getData(asyncCall) {
 
         window.location.href = "index.html?gqlerror=1";
     }
+    key = key + 1;
+    return true;
 }
 
 function getStaticData() {
@@ -509,27 +511,40 @@ class App extends React.Component {
         loadingBoxShow("block");
 
         setTimeout( ()=>{
-			this.setState({
+			    this.setState({
             reloadCount : this.state.reloadCount + 1,
-        })
-		},10)
+          })
+        },10);
+        
     }
     componentWillMount(){
       document.body.style.overflow = "scroll"
     }
     render() {
-        
-		getData();
-        //getStaticData();
-        loadingBoxHide();
-        let apptext = " List of Applications";
-        let title = " | View"
+		  var bool = getData();
+
+      loadingBoxHide();
+
+      let apptext = " List of Applications";
+      let title = " | View"
+      
+      if (bool) {
         return (
             <div>
                 <Header text={title} applinktext={apptext} instanceName={headerInstanceName}/>
-                <TestComponent data={treedata} reloadController={this.reload}/>
+                <TestComponent key={key} data={treedata} reloadController={this.reload}/>
             </div>
         );
+      } else {
+        treedata = [];
+        key = key + 1;
+        return (
+          <div>
+              <Header text={title} applinktext={apptext} instanceName={headerInstanceName}/>
+              <TestComponent key={key} data={treedata} reloadController={this.reload}/>
+          </div>
+      );
+      }
     }
 }
 

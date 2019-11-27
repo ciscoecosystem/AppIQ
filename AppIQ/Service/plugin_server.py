@@ -180,38 +180,6 @@ def set_polling_interval(interval):
         logger.info("Time for set_polling_interval: " + str(end_time - start_time))
     
 
-def set_sleep_var(sleep_var):
-    """
-    Sets the sleeping variable in config file
-    """
-    
-    start_time = datetime.datetime.now()
-    path = "/home/app/data/SleepVar.json"
-    try:
-        if os.path.isfile(path):
-            with open(path, "r+") as creds:
-                config_data = json.load(creds)
-                if sleep_var:
-                    config_data["sleep_var"] = str(1)
-                else:
-                    config_data["sleep_var"] = str(0)
-
-                creds.seek(0)
-                creds.truncate()
-                json.dump(config_data, creds)
-            
-            return True
-        else:
-            raise Exception
-    except Exception as err:
-        err_msg = "Exception while setting sleeping variable : " + str(err)
-        logger.error(err_msg)
-        return False, err_msg
-    finally:
-        end_time =  datetime.datetime.now()
-        logger.info("Time for set_sleep_var: " + str(end_time - start_time))
-
-
 #@app.route('/apps.json', methods=['GET'])  # This shall be called from /check.json, for Cisco Live this is the first/start Route
 def apps(tenant):
     start_time = datetime.datetime.now()
@@ -225,8 +193,6 @@ def apps(tenant):
             temp_dict = {'appProfileName': each.get('appName'), 'isViewEnabled': each.get('isViewEnabled'),
                          'health': str(each.get('appHealth')), 'appId': each.get('appId')}
             app_list.append(temp_dict)
-            if each.get('isViewEnabled') == True:
-                mapping(tenant, each['appId'])
         app_dict['app'] = app_list
         
         logger.info("UI Action app.json ended")
@@ -276,57 +242,29 @@ def mapping(tenant, appDId):
             return json.dumps({"instanceName":get_instance_name(),"payload": mapping_dict, 
                                "status_code": "200","message": "OK"})
 
+        # Get new mapping based on recommendation which may have new nodes
+        current_mapping = get_mapping_dict_target_cluster(mapped_objects)
+
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
 
-            # Get new mapping based on recommendation which may have new nodes
-            current_mapping = get_mapping_dict_target_cluster(mapped_objects)
-            new_nodes = []
-            is_mapping_changed = False
+            #current mapping -> new mapping between aci and appd
             for new_map in current_mapping:
-                found = False
-                for existing_map in already_mapped_data:
-                    key_1 = 'ipaddress'
-                    key_2 = 'ipaddress'
-                    if 'ipaddress' not in existing_map:
-                        key_1 = 'macaddress'
-                    if 'ipaddress' not in new_map:
-                        key_2 = 'macaddress'
-
+                #already_mapped_data from database right side
+                for each_already_mapped in already_mapped_data:
+                    key = 'ipaddress'
+                    if 'ipaddress' not in each_already_mapped:
+                        key = 'macaddress'
+                        
                     # Find node which is same as based on recommendation
-                    if existing_map.get(key_1) == new_map.get(key_2) and existing_map.get('domainName') == new_map.get('domainName'):
+                    if each_already_mapped.get(key) == new_map.get(key) and each_already_mapped.get('domainName') == new_map.get('domainName'):
                         # If disabled node found in recommended and saved mapping then it should be disabled
-                        if existing_map.get('disabled') == True:
-                            is_mapping_changed = True
+                        if each_already_mapped.get('disabled') == True:
                             new_map['disabled'] = True
-                        found = True
                         break
-                # If node not found in existing mapping, maintain it in different list
-                if not found:
-                    new_nodes.append(new_map)  
 
-            if len(new_nodes) > 0 or is_mapping_changed:
-                # If new node found, generate new mapping and save it in DB
-                database_object.check_if_exists_and_update('Mapping', [appId, current_mapping])
-                mapping_dict['target_cluster'] = [node for node in current_mapping if node.get('disabled') == False]
-            else:
-                mapping_dict['target_cluster'] = [node for node in already_mapped_data if node.get('disabled') == False]
-        else:
-            logger.info("Mapping Empty!")
-            app_list = database_object.get_app_list()
-            logger.info('AppD App List for Mapping after already mapped: '+str(app_list))
-            
-            # TODO: Why not get the App with given AppId from DB?? with a where clause
-            for app in app_list:
-                if app.get('appId') == appDId and app.get('isViewEnabled') == True:
-                    target = get_mapping_dict_target_cluster(mapped_objects)
-                    mapping_dict['target_cluster'] = target
-                                       
-                    # Put mapping in DB
-                    database_object.check_if_exists_and_update('Mapping', [appId, target])
-                    
-                    # TODO: See the use of enableView
-                    enable_view(appId, True)
+        database_object.check_if_exists_and_update('Mapping', [appId, current_mapping])
+        mapping_dict['target_cluster'] = [node for node in current_mapping if node.get('disabled') == False]
 
         for new_object in mapped_objects:
             mapping_dict['source_cluster'].append(new_object)
@@ -407,7 +345,7 @@ def get_faults(dn):
     Get List of Faults from APIC related to the given Modular object.
     """
     start_time = datetime.datetime.utcnow()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     faults_resp = aci_util_obj.get_ap_epg_faults(start_time, dn)
 
     if faults_resp:
@@ -441,7 +379,7 @@ def get_events(dn):
     Get List of Events related to the given MO.
     """
     start_time = datetime.datetime.utcnow()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     events_resp = aci_util_obj.get_ap_epg_events(start_time, dn)
 
     if events_resp:
@@ -477,7 +415,7 @@ def get_audit_logs(dn):
     """
 
     start_time = datetime.datetime.utcnow()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     audit_logs_resp = aci_util_obj.get_ap_epg_audit_logs(start_time, dn)
 
     if audit_logs_resp:
@@ -509,7 +447,7 @@ def get_audit_logs(dn):
 
 def get_childrenEp_info(dn, mo_type, ip_list):
     start_time = datetime.datetime.now()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     if mo_type == "ep":
         ip_list = ip_list.split(",")
         ip_query_filter_list = []
@@ -643,7 +581,7 @@ def get_ep_info(ep_children_list, aci_util_obj):
 
 def get_configured_access_policies(tn, ap, epg):
     start_time = datetime.datetime.now()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     cap_url = "/mqapi2/deployment.query.json?mode=epgtoipg&tn=" + tn + "&ap=" + ap + "&epg=" + epg
     cap_resp = aci_util_obj.get_mo_related_item("", cap_url, "other_url")
     cap_list = []
@@ -734,7 +672,7 @@ def get_subnets(dn):
     Gets the Subnets Information for an EPG
     """
     start_time = datetime.datetime.now()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     subnet_query_string = "query-target=children&target-subtree-class=fvSubnet"
     subnet_resp = aci_util_obj.get_mo_related_item(dn, subnet_query_string, "")
     subnet_list = []
@@ -771,7 +709,7 @@ def get_to_Epg_traffic(epg_dn):
     """
 
     start_time = datetime.datetime.now()
-    aci_util_obj = aci_utils.ACI_Utils("")
+    aci_util_obj = aci_utils.ACI_Utils()
     epg_traffic_query_string = 'query-target-filter=eq(vzFromEPg.epgDn,"' + epg_dn + '")&rsp-subtree=full&rsp-subtree-class=vzToEPg,vzRsRFltAtt,vzCreatedBy&rsp-subtree-include=required'
     epg_traffic_resp = aci_util_obj.get_all_mo_instances("vzFromEPg", epg_traffic_query_string)
     if epg_traffic_resp["status"]:
@@ -990,8 +928,8 @@ def tree(tenant, appId):
     try:
         start_time = datetime.datetime.now()
         logger.info('UI Action TREE started')
-        set_sleep_var(True)
-        aci_util_obj = aci_utils.ACI_Utils(tenant)
+        aci_util_obj = aci_utils.ACI_Utils()
+        mapping(tenant, appId)
         merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
         response = json.dumps(d3Object.generate_d3_compatible_dict(merged_data))
         return json.dumps({"instanceName":get_instance_name(),"payload": response, "status_code": "200", "message": "OK"})
@@ -999,7 +937,6 @@ def tree(tenant, appId):
         logger.exception("Error while run.json" + str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
     finally:
-        set_sleep_var(False)
         end_time =  datetime.datetime.now()
         logger.info("Time for TREE: " + str(end_time - start_time))
 
@@ -1011,7 +948,7 @@ def merge_aci_appd(tenant, appDId, aci_util_obj):
     start_time = datetime.datetime.now()
     logger.info('Merging objects for Tenant:'+str(tenant)+', app_id'+str(appDId))
     try:
-        aci_data = aci_util_obj.main()
+        aci_data = aci_util_obj.main(tenant)
 
         merge_list = []
         merged_eps = []
@@ -1196,10 +1133,11 @@ def get_details(tenant, appId):
         start_time = datetime.datetime.now()
         logger.info("UI Action details.json started")
         
-        set_sleep_var(True)
-        aci_util_obj = aci_utils.ACI_Utils(tenant)
+        aci_util_obj = aci_utils.ACI_Utils()
 
         details_list = []
+        
+        mapping(tenant, appId)
         merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
         #get_to_Epg_traffic("uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-Ord")
 
@@ -1226,7 +1164,6 @@ def get_details(tenant, appId):
         logger.exception("Could not load the Details. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Details. Error: "+str(e)})
     finally:
-        set_sleep_var(False)
         end_time =  datetime.datetime.now()
         logger.info("Time for GET_DETAILS: " + str(end_time - start_time))
 

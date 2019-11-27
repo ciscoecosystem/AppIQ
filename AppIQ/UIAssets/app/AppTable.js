@@ -57,7 +57,7 @@ export default class AppTable extends React.Component{
         window.location.href = "details.html?appId=" + encodeURIComponent(data.appId) + "&tn=" + encodeURIComponent(this.state.tenantName);
     }
     render(){
-      return  <Table data={this.state.jsonData} columns={this.columns}></Table>
+      return  <Table data={this.props.rows} columns={this.columns}></Table>
     }
 
 }

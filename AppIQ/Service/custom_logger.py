@@ -17,8 +17,8 @@ class CustomLogger(object):
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.DEBUG)
 
-        # create a file handler
-        handler = logging.FileHandler(path)
+        # create a file handler to rotate every 12 hours for maximum 5 times
+        handler = logging.handlers.TimedRotatingFileHandler(path, when='H', interval=1, backupCount=5)
         handler.setLevel(logging.DEBUG)
 
         # create a logging format

@@ -2,7 +2,6 @@ __author__ = 'nilayshah'
 
 import requests
 import json, base64
-import logging
 import datetime
 import urls
 from cobra.model.pol import Uni as PolUni
@@ -40,24 +39,30 @@ def create_cert_session():
 
 
 class ACI_Utils(object):
-    def __init__(self, tenant):
-        self.apic_ip = '172.17.0.1'
-        self.tenant = tenant
+    __instance = None
 
-        self.session = requests.Session()
+    def __new__(cls):
+        if cls.__instance is None:
+            cls.__instance = super(ACI_Utils, cls).__new__(cls)
+            cls.apic_ip = '172.17.0.1'
+            cls.session = requests.Session()
+            cls.proto = 'https://'
+            cls.apic_token = cls.__instance.login()
         
-        self.proto = 'https://'
-        self.apic_token = self.login()
-        if not self.apic_token:
-            logger.warning('Connection to APIC failed. Trying http instead...')
-            self.proto = 'http://'
-            self.apic_token = self.login()
-        if self.apic_token:
-            self.ep_url = urls.FVEP_URL.format(self.proto, self.apic_ip)
-            self.ip_url = urls.FVIP_URL.format(self.proto, self.apic_ip)
-            self.epg_url = urls.FVAEPG_URL.format(self.proto, self.apic_ip)
-        else:
-            logger.error('Could not connect to APIC. Please verify your APIC connection.')
+            if not cls.apic_token:
+                logger.warning('Connection to APIC failed. Trying http instead...')
+                cls.proto = 'http://'
+                logger.info(cls.proto)
+                logger.info(cls.apic_ip)
+                cls.apic_token = cls.__instance.login()
+                
+            if cls.apic_token:
+                cls.ep_url = urls.FVEP_URL.format(cls.proto, cls.apic_ip)
+                cls.ip_url = urls.FVIP_URL.format(cls.proto, cls.apic_ip)
+                cls.epg_url = urls.FVAEPG_URL.format(cls.proto, cls.apic_ip)
+            else:
+                logger.error('Could not connect to APIC. Please verify your APIC connection.')
+        return cls.__instance
 
 
     def login(self):
@@ -66,7 +71,6 @@ class ACI_Utils(object):
         """
         start_time = datetime.datetime.now()
         global auth_token
-
         user_cert, plugin_key = create_cert_session()
         app_token_payload = {"aaaAppToken": {"attributes": {"appName": "Cisco_AppIQ"}}}
         data = json.dumps(app_token_payload)
@@ -129,12 +133,12 @@ class ACI_Utils(object):
         try:
             if item_type == "":
                 url = urls.MO_URL.format(self.proto, self.apic_ip, mo_dn, item_query_string)
+            elif item_type == "other_url":
+                url = "{0}{1}{2}".format(self.proto, self.apic_ip, item_query_string)
             elif item_type == "HealthRecords":
                 url = urls.MO_HEALTH_URL.format(self.proto, self.apic_ip, mo_dn)
             elif item_type == "ifConnRecords":
                 url = urls.MO_OTHER_URL.format(self.proto, self.apic_ip, mo_dn, item_query_string)
-            elif item_type == "other_url":
-                url = "{0}{1}{2}".format(self.proto, self.apic_ip, item_query_string)
 
             response = self.ACI_get(url, cookie = {'APIC-Cookie': self.apic_token})
             item_list = ((json.loads(response.text)['imdata']))
@@ -193,8 +197,7 @@ class ACI_Utils(object):
             if data:
                 logger.debug('Total EPs fetched for Tenant: '+str(tenant)+' - '+str(len(data))+ 'EPs')
                 return data
-            else:
-                return []
+            return []
         except Exception as e:
             logger.exception('Exception in EP/IP Data API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve EP data. Error: "+str(e)})
@@ -213,8 +216,7 @@ class ACI_Utils(object):
             if data:
                 logger.debug('Total EPGs fetched for Tenant: '+str(tenant)+' - '+str(len(data))+ 'EPGs')
                 return data
-            else:
-                return []
+            return []
         except Exception as e:
             logger.exception('Exception in EPG Data API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve EPG data. Error: "+str(e)})
@@ -233,8 +235,7 @@ class ACI_Utils(object):
             if data:
                 bd_data = data[0]['fvRsBd']['attributes']['tnFvBDName']
                 return bd_data
-            else:
-                return ""
+            return ""
         except Exception as e:
             logger.exception('Exception in BD API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could retrieve BD data. Error: "+str(e)})
@@ -253,8 +254,7 @@ class ACI_Utils(object):
             if data:
                 vrf_data = data[0]['fvRsCtx']['attributes']['tnFvCtxName']
                 return vrf_data
-            else:
-                return ""
+            return ""
         except Exception as e:
             logger.exception('Exception in VRF API call, Error:'+str(e))
             return json.dumps({"payload": {}, "status_code": "300", "message": "Internal backend error: could not retrieve VRF data. Error: "+str(e)})
@@ -340,13 +340,9 @@ class ACI_Utils(object):
 
                 if not is_ip_list:
                     fviplist.append(str(ep['fvCEp']['attributes']['mac']))
-                    
-                dn_str = str(ep_attr['dn'])
-                for ip in fviplist:
-                    
-                    ep_dict = {"AppProfile": '', 'EPG': '', 'CEP-Mac': '', 'IP': '', 'Interfaces': [], 'VM-Name': '', 'BD': '',
-                           'VMM-Domain': '', 'Contracts': [], 'VRF':'','dn': '/'.join((dn_str.split('/', 4)[0:4]))}
 
+                if fviplist: 
+                    dn_str = str(ep_attr['dn'])
                     dn_split = dn_str.split("/", 5)
                     bd_str = dn_split[0] + '/' + dn_split[1] + '/' + dn_split[2] + '/' + dn_split[3]
                     bd_data = self.apic_fetchBD(bd_str, apic_token=apic_token)
@@ -354,47 +350,53 @@ class ACI_Utils(object):
                     vrf_data = self.apic_fetchVRF(vrf_str, apic_token=apic_token)
                     vrf_name =  dn_split[1].split('-')[1] + "/" + vrf_data
                     ct_data_list = self.apic_fetchContract(bd_str, apic_token=apic_token)
-                    ep_dict.update({'VRF': str(vrf_name)})
-                    ep_dict.update({'Contracts': ct_data_list})
-                    ep_dict.update({'BD': str(bd_data)})
-                    splitString = dn_str.split("/")
-                    if "." in ip:
-                        ep_dict.update({"IP": str(ip)})
-                    for eachSplit in splitString:
-                        if "-" in eachSplit:
-                            epSplit = eachSplit.split("-", 1)
-                            if epSplit[0] == "ap":
-                                ep_dict.update({"AppProfile": str(epSplit[1])})
-                            elif epSplit[0] == "epg":
-                                ep_dict.update({"EPG": str(epSplit[1])})
-                            elif epSplit[0] == "cep":
-                                ep_dict.update({"CEP-Mac": str(epSplit[1])})
-                    # ep_dict.update({'IP': str(ep_attr['ip'])})
-                    ep_child_attr = ep['fvCEp']['children']
-                    path_list = []
-                    for child in ep_child_attr:
-                        if str(child.keys()[0]) == 'fvRsCEpToPathEp':
-                            path_list.append(str(child['fvRsCEpToPathEp']['attributes']['tDn']))
+
+                    for ip in fviplist:
                         
-                        if str(child.keys()[0]) == 'fvRsToVm':
-                            tDn_dom = str(child['fvRsToVm']['attributes']['tDn'])
-                            vmmDom = str(tDn_dom.split("ctrlr-[")[1].split(']-')[0])
+                        ep_dict = {"AppProfile": '', 'EPG': '', 'CEP-Mac': '', 'IP': '', 'Interfaces': [], 'VM-Name': '', 'BD': '',
+                            'VMM-Domain': '', 'Contracts': [], 'VRF':'','dn': '/'.join((dn_str.split('/', 4)[0:4]))}
+
+                        ep_dict.update({'VRF': str(vrf_name)})
+                        ep_dict.update({'Contracts': ct_data_list})
+                        ep_dict.update({'BD': str(bd_data)})
+                        splitString = dn_str.split("/")
+                        if "." in ip:
+                            ep_dict.update({"IP": str(ip)})
+                        for eachSplit in splitString:
+                            if "-" in eachSplit:
+                                epSplit = eachSplit.split("-", 1)
+                                if epSplit[0] == "ap":
+                                    ep_dict.update({"AppProfile": str(epSplit[1])})
+                                elif epSplit[0] == "epg":
+                                    ep_dict.update({"EPG": str(epSplit[1])})
+                                elif epSplit[0] == "cep":
+                                    ep_dict.update({"CEP-Mac": str(epSplit[1])})
+                        # ep_dict.update({'IP': str(ep_attr['ip'])})
+                        ep_child_attr = ep['fvCEp']['children']
+                        path_list = []
+                        for child in ep_child_attr:
+                            if str(child.keys()[0]) == 'fvRsCEpToPathEp':
+                                path_list.append(str(child['fvRsCEpToPathEp']['attributes']['tDn']))
                             
-                            ep_dict.update({'VMM-Domain': vmmDom})
-                            tDn = str(child['fvRsToVm']['attributes']['tDn'])
-                            vm_url = self.proto + self.apic_ip + '/api/mo/' + tDn + '.json'
-                            vm_response = self.ACI_get(vm_url,cookie={'APIC-Cookie': apic_token})
+                            if str(child.keys()[0]) == 'fvRsToVm':
+                                tDn_dom = str(child['fvRsToVm']['attributes']['tDn'])
+                                vmmDom = str(tDn_dom.split("ctrlr-[")[1].split(']-')[0])
+                                
+                                ep_dict.update({'VMM-Domain': vmmDom})
+                                tDn = str(child['fvRsToVm']['attributes']['tDn'])
+                                vm_url = self.proto + self.apic_ip + '/api/mo/' + tDn + '.json'
+                                vm_response = self.ACI_get(vm_url,cookie={'APIC-Cookie': apic_token})
 
-                            vm_name = json.loads(vm_response.text)['imdata'][0]['compVm']['attributes']['name']
+                                vm_name = json.loads(vm_response.text)['imdata'][0]['compVm']['attributes']['name']
 
-                            if not vm_name:
-                                vm_name = 'EP-'+str(ep['fvCEp']['attributes']['name'])
-                            ep_dict.update({'VM-Name': str(vm_name)})
-                        else:
-                            ep_dict.update({'VMM-Domain':'None'})
-                            ep_dict.update({'VM-Name':'EP-'+str(ep['fvCEp']['attributes']['name'])})
-                        ep_dict.update({'Interfaces': path_list})
-                    ep_list.append(ep_dict)
+                                if not vm_name:
+                                    vm_name = 'EP-'+str(ep['fvCEp']['attributes']['name'])
+                                ep_dict.update({'VM-Name': str(vm_name)})
+                            else:
+                                ep_dict.update({'VMM-Domain':'None'})
+                                ep_dict.update({'VM-Name':'EP-'+str(ep['fvCEp']['attributes']['name'])})
+                            ep_dict.update({'Interfaces': path_list})
+                        ep_list.append(ep_dict)
             return ep_list
         except Exception as e:
             logger.exception('Exeption in ACI Parsing Data, Error: '+str(e))
@@ -458,19 +460,17 @@ class ACI_Utils(object):
             check = self.check_unicast_routing(bd)
             if check == "yes":
                 return True, dn
-            else:
-                return False, None
         except Exception as e:
             logger.exception("Exception occured while get unicast routing:"+str(e))
-            return False, None
+        return False, None
 
 
-    def main(self):
+    def main(self, tenant):
         start_time = datetime.datetime.now()
         try:
             auth_token = self.login()
             logger.info('APIC Login success!')
-            epg_data = self.apic_fetchEPGData(self.tenant, apic_token=auth_token)
+            epg_data = self.apic_fetchEPGData(tenant, apic_token=auth_token)
             parse_data = self.apic_parseData(epg_data,apic_token=auth_token)
             return parse_data
         except Exception as e:

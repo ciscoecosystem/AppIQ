@@ -27,13 +27,3 @@ if file_exists:
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     pass
-
-
-if __name__ == '__main__':
-    database_object = Database.Database()
-    database_object.createTables()
-    path = "/home/app/data/credentials.json"
-    file_exists = os.path.isfile(path)
-    if file_exists:
-        os.remove(path)
-    app.run(host='0.0.0.0', port=80, threaded=True)
