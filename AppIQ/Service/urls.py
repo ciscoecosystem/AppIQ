@@ -18,8 +18,8 @@ FETCH_BD_URL = '{0}{1}/api/node/mo/{2}.json?query-target=children&target-subtree
 FETCH_VRF_URL = '{0}{1}/api/node/mo/{2}.json?query-target=children&target-subtree-class=fvRsCtx'
 FETCH_CONTRACT_URL = '{0}{1}/api/node/mo/{2}.json?query-target=children&target-subtree-class=fvRsCons,fvRsProv,fvRsConsIf,fvRsProtBy,fvRsConsIf'
 
-CHECK_UNICAST_URL = '{0}{1}/api/node/class/fvBD.json?query-target-filter=eq(fvBD.name,{2})'
-FETCH_EP_MAC_URL = '{0}{1}/api/node/class/fvCEp.json?query-target-filter=eq(fvCEp.mac,{2})'
+CHECK_UNICAST_URL = '{0}{1}/api/node/class/fvBD.json?query-target-filter=eq(fvBD.name,"{2}")'
+FETCH_EP_MAC_URL = '{0}{1}/api/node/class/fvCEp.json?query-target-filter=eq(fvCEp.mac,"{2}")'
 
 AUDIT_LOGS_QUERY = 'rsp-subtree-include=audit-logs,no-scoped,subtree'
 FAULTS_QUERY = 'rsp-subtree-include=fault-records,no-scoped,subtree'

@@ -242,11 +242,12 @@ def mapping(tenant, appDId):
             return json.dumps({"instanceName":get_instance_name(),"payload": mapping_dict, 
                                "status_code": "200","message": "OK"})
 
+        # Get new mapping based on recommendation which may have new nodes
+        current_mapping = get_mapping_dict_target_cluster(mapped_objects)
+
         if already_mapped_data != None:
             logger.info('Mapping to target cluster already exists')
 
-            # Get new mapping based on recommendation which may have new nodes
-            current_mapping = get_mapping_dict_target_cluster(mapped_objects)
             #current mapping -> new mapping between aci and appd
             for new_map in current_mapping:
                 #already_mapped_data from database right side
