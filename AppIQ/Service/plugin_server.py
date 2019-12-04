@@ -112,19 +112,11 @@ def login(appd_creds):
 
     appd_object = appd_utils.AppD(appd_ip, appd_port, appd_user, appd_account, appd_pw)
     try:
-        login_check = appd_object.check_connection()
+        login_status = appd_object.check_connection()
 
-        if login_check == 200 or login_check == 201:
+        if login_status == 200 or login_status == 201:
             credentials = {'appd_ip': appd_ip, 'appd_port': appd_port, 'appd_user': appd_user, 'appd_account': appd_account,
                         'appd_pw': appd_pw, 'polling_interval': '1'}
-            sleep_cred = {'sleep_var': '0'}
-
-            # New file for sleep_var
-            with open("/home/app/data/SleepVar.json", 'w+') as screds:
-                screds.seek(0)
-                screds.truncate()
-                json.dump(sleep_cred, screds)
-                screds.close()
 
             # This is the main process being started.
             Process(target=appd_object.main).start()
@@ -139,10 +131,10 @@ def login(appd_creds):
             return json.dumps({"payload": "Connection Successful", "status_code": "200",
                                "message": "Credentials Saved!"})  # login_resp
         else:
-            logger.error("login failed:"+str(login_check))
-            return json.dumps({"payload": "Login to AppDynamics Failed", "status_code": str(login_check),
+            logger.error("login failed:"+str(login_status))
+            return json.dumps({"payload": "Login to AppDynamics Failed", "status_code": str(login_status),
                                 "message": "Login to AppDynamics failed, exited with code: " + str(
-                                    login_check) + ". Please verify AppDynamics connection"})
+                                    login_status) + ". Please verify AppDynamics connection"})
 
     except Exception as e:
         return json.dumps({"payload": "Not signed in", "status_code": "300",
@@ -180,7 +172,6 @@ def set_polling_interval(interval):
         logger.info("Time for set_polling_interval: " + str(end_time - start_time))
     
 
-#@app.route('/apps.json', methods=['GET'])  # This shall be called from /check.json, for Cisco Live this is the first/start Route
 def apps(tenant):
     start_time = datetime.datetime.now()
     try:
