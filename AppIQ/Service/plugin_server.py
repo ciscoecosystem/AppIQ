@@ -64,8 +64,9 @@ def checkFile():
                                    "message": "Exited with code: " + str(
                                        status) + ". Please verify AppDynamics connection"})
         except Exception as e:
+            logger.exception("Error while check file! Error:" + str(e))
             return json.dumps({"payload": "Not logged in", "status_code": "300",
-                               "message": str(e) + ". Please re-configure AppDynamics Controller!"})
+                               "message": "Please re-configure AppDynamics Controller!"})
         finally:
             end_time =  datetime.datetime.now()
             logger.info("Time for checkFile: " + str(end_time - start_time))
@@ -137,8 +138,9 @@ def login(appd_creds):
                                     login_status) + ". Please verify AppDynamics connection"})
 
     except Exception as e:
+        logger.exception("Error while login! Error:" + str(e))
         return json.dumps({"payload": "Not signed in", "status_code": "300",
-                           "message": "An error occured while saving AppDynamics Credentials. Please try again! Error: "+str(e)})
+                           "message": "An error occured while saving AppDynamics Credentials. Please try again!"})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for LOGIN to APP: " + str(end_time - start_time))
@@ -190,7 +192,7 @@ def apps(tenant):
         return json.dumps({"instanceName":get_instance_name(),"payload": app_dict, "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not fetch applications from databse. Error: "+str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch applications from databse. Error: "+str(e)})
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch applications from databse."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for APPS: " + str(end_time - start_time))
@@ -266,7 +268,7 @@ def mapping(tenant, appDId):
                            "message": "OK"})
     except Exception as e:
         logger.exception('Exception in Mapping, Error:'+str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch mappings from the database. Error: "+str(e)})
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not fetch mappings from the database."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for MAPPING: " + str(end_time - start_time))
@@ -322,10 +324,11 @@ def save_mapping(appDId, tenant, mappedData):
             database_object.delete_entry('Mapping', appId)
             database_object.check_if_exists_and_update('Mapping', [appId, data_list])
             enable_view(appDId, True)
+        database_object.commit_session()
         return json.dumps({"payload": "Saved Mappings", "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not save mappings to the database. Error: "+str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not save mappings to the database. Error: "+str(e)})
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not save mappings to the database."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for saveMapping: " + str(end_time - start_time))
@@ -908,7 +911,8 @@ def enable_view(appid, bool):
     try:
         return database_object.enable_view_update(appid, bool)
     except Exception as e:
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view. Error: "+str(e)})
+        logger.exception("Error while enabling view for app:" + str(appid) + ". Error:" + str(e))
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not enable the view."})
 
 
 @app.route('/run.json')
@@ -925,8 +929,8 @@ def tree(tenant, appId):
         response = json.dumps(d3Object.generate_d3_compatible_dict(merged_data))
         return json.dumps({"instanceName":get_instance_name(),"payload": response, "status_code": "200", "message": "OK"})
     except Exception as e:
-        logger.exception("Error while run.json" + str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
+        logger.exception("Error while building tree from run.json for app:" + str(appId) + ". Error:" + str(e))
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for TREE: " + str(end_time - start_time))
@@ -1037,7 +1041,7 @@ def merge_aci_appd(tenant, appDId, aci_util_obj):
         return final_list #updated_merged_list#,total_epg_count # TBD for returning values
     except Exception as e:
         logger.exception("Error while merge_aci_data : "+str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Merge ACI and AppDynamics objects. Error: "+str(e)})
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Merge ACI and AppDynamics objects."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for merge_aci_appd: " + str(end_time - start_time))
@@ -1112,7 +1116,7 @@ def get_appD(appId, ep):
         return appd_list
     except Exception as e:
         logger.exception("Could not load the View. Error: "+str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View. Error: "+str(e)})
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the View."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for get_appD: " + str(end_time - start_time))
@@ -1153,7 +1157,7 @@ def get_details(tenant, appId):
         return json.dumps({"instanceName":get_instance_name(),"payload": details, "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not load the Details. Error: "+str(e))
-        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Details. Error: "+str(e)})
+        return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Details."})
     finally:
         end_time =  datetime.datetime.now()
         logger.info("Time for GET_DETAILS: " + str(end_time - start_time))
