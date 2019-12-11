@@ -254,10 +254,9 @@ class Database():
     def createTables(self):
         try:
             self.metadata.create_all(self.engine)
-            return None
         except Exception as e:
             logger.exception('Exception in creating tables: ' + str(e))
-            return None
+        return None
 
 
     def flush_session(self):
@@ -378,12 +377,10 @@ class Database():
                 return self.session.query(ACItemp).all()
             elif table == 'ACIperm':
                 return self.session.query(ACIperm).all()
-            else:
-                return []
         except Exception as e:
             logger.exception('Exception in returning values for table: ' + str(table) + ', Error:' + str(e))
             self.commit_session()
-            return []
+        return []
 
 
     def delete_entry(self, table, deleteid):
@@ -610,16 +607,15 @@ class Database():
         try:
             if query_type == 'appId':
                 # query = self.session.query(Application).all()
-
                 return self.session.query(Application).filter(Application.appId == query_params)
             if query_type == 'appName':
                 return self.session.query(Application).filter(Application.appName == query_params)
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not return Application details. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Application details. Error: " + str(
-                                   e)})
+            logger.info("Exception occured for query_type: "+query_type)
+            logger.info("Exception occured for query_params: "+query_params)
+            return []
 
 
     def return_tiers(self, query_type, query_params):
@@ -634,8 +630,9 @@ class Database():
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not return Tier details. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Tier details. Error: " + str(e)})
+            logger.info("Exception occured for query_type: "+query_type)
+            logger.info("Exception occured for query_params: "+query_params)
+            return []
 
 
     def return_nodes(self, query_type, query_params):
@@ -655,8 +652,9 @@ class Database():
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not return Node details. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Node details. Error: " + str(e)})
+            logger.info("Exception occured for query_type: "+query_type)
+            logger.info("Exception occured for query_params: "+query_params)
+            return []
 
 
     def return_service_endpoints(self, query_type, query_params):
@@ -670,9 +668,9 @@ class Database():
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not return service endpoints. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return service endpoints. Error: " + str(
-                                   e)})
+            logger.info("Exception occured for query_type: "+query_type)
+            logger.info("Exception occured for query_params: "+query_params)
+            return []
 
 
     def return_health_violations(self, query_type, query_params):
@@ -692,30 +690,27 @@ class Database():
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not return Health violations. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not return Health violations. Error: " + str(
-                                   e)})
+            logger.info("Exception occured for query_type: "+query_type)
+            logger.info("Exception occured for query_params: "+query_params)
+            return []
 
 
     def get_app_list(self):
+        applicationList = []
         try:
             appList = self.session.query(Application).all()
-            applicationList = []
             for app in appList:
                 application = {'appId': app.appId, 'appName': str(app.appName),
                                'appHealth': str(app.appMetrics['data'][0]['severitySummary']['performanceState']),
                                'isViewEnabled': app.isViewEnabled}
                 applicationList.append(application)
             self.commit_session()
-            return applicationList
         except Exception as e:
             self.flush_session()
             logger.exception( "Internal backend error: could not retrieve Application list. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not retrieve Application list. Error: " + str(
-                                   e)})
-
+        return applicationList
     
+
     def get_app_by_id(self, id):
         try:
             app = self.session.query(Application).filter(and_(Application.appId == id, Application.isViewEnabled == True)).first()
@@ -751,8 +746,8 @@ class Database():
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not retrieve mappings. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not retrieve mappings. Error: " + str(e)})
+            logger.info("Exception occured for query_params: "+query_params)
+            return []
 
 
     def ips_for_app(self, appId):
@@ -761,6 +756,4 @@ class Database():
         except Exception as e:
             self.flush_session()
             logger.exception("Internal backend error: could not retrieve nodes. Error: " + str(e))
-            return json.dumps({"payload": {}, "status_code": "300",
-                               "message": "Internal backend error: could not retrieve nodes. Error: " + str(e)})
-
+            return []

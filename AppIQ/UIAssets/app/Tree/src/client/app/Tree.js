@@ -505,22 +505,13 @@ export default class Tree extends React.Component {
         >
           <svg width="100%" height="100%">
             <text
-              x={windowWidth}
+              x={windowWidth/2}
               y={windowHeight}
               font-family="sans-serif"
               font-size="20px"
               fill="grey"
             >
-              Tree View is not available
-            </text>
-            <text
-              x={windowWidth - 37}
-              y={windowHeight + 30}
-              font-family="sans-serif"
-              font-size="19px"
-              fill="grey"
-            >
-              (Add Endpoints To This Application)
+              No Endpoints Found for the given Application in the given Tenant.
             </text>
           </svg>
         </div>

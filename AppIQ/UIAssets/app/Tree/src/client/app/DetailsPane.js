@@ -222,7 +222,7 @@ function CardData(props) {
   );
 }
 function HealthRuleViolations(props) {
-  if (props.data.constructor == Array && props.data.length>0) {
+  if (props.data && props.data.constructor == Array && props.data.length>0) {
 	  let keys = [
                     "Violation Id",
 					"Status",
@@ -256,7 +256,7 @@ function HealthRuleViolations(props) {
 }
 
 function ServiceEndpoints(props) {
-  if (props.data.constructor == Array) {
+  if (props.data && props.data.constructor == Array && props.data.length > 0) {
     return props.data.map(endPoint => {
       return (
         <table className="info-table">
@@ -277,10 +277,10 @@ function ServiceEndpoints(props) {
       );
     });
   }
-  return NoInformation;
+  return NoInformation();
 }
 function ContractDetails(props) {
-  if (props.attributes.constructor == Array) {
+  if (props.data && props.attributes.constructor == Array && props.data.length > 0) {
     return (
       <table className="info-table">
         {props.attributes.map(key => {
@@ -294,6 +294,6 @@ function ContractDetails(props) {
       </table>
     );
   }
-  return NoInformation;
+  return NoInformation();
 }
 export default DetailsPane;

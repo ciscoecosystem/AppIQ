@@ -101,7 +101,7 @@ export default class DataTable extends Component {
     return (
       <div>
         <ToolBar onReload={() => this.props.onReload(true)} />
-        <Table loading={this.state.loading} className="-striped -highlight" noDataText="No endpoints found for the given Application" data={this.state.row} columns={this.state.columns}></Table>
+        <Table loading={this.state.loading} className="-striped -highlight" noDataText="No endpoints found for the given Application in the given Tenant." data={this.state.row} columns={this.state.columns}></Table>
       </div>
     )
 

@@ -14,9 +14,11 @@ class generateD3Dict(object):
     def generate_d3_compatible_dict(self, data):
         # Get distinct app profiles
         app_profs = set()
+
         for node in data:
             app_profs.add(node['AppProfile'])
         app_profs_converted = []
+
         for app_prof in app_profs:
             # Filter out app prof nodes
             app_nodes = filter(lambda x: x['AppProfile'] == app_prof, data)
@@ -60,7 +62,6 @@ class generateD3Dict(object):
                 epg_dict['attributes'] = {
                     'VRF': epg_nodes[0]['VRF'],
                     'BD': epg_nodes[0]['BD'],
-                    'VMM-Domain': epg_nodes[0]['VMM-Domain'],
                     'Contracts': epg_nodes[0]['Contracts'],
                     # 'Contracts' : list(set([x['Contracts'][0] for x in epg_nodes if len(x['Contracts']) > 0])), #if len(x['Contracts']) > 0 else ['None']
                     'Nodes': list(set([x['nodeName'] for x in epg_nodes])),
@@ -70,16 +71,7 @@ class generateD3Dict(object):
                 if 'Machine Agent Enabled' in epg_nodes[0]:
                     epg_dict['attributes']['Machine Agent Enabled'] = 'True'
 
-                # if (epg_dict['attributes']['Contracts']) == set(['None']):
-                #    del epg_dict['attributes']['Contracts']
-                # epg_dict['attributes'] = {
-                #     'vrf': 'AppD-VRF',
-                #     'bd': 'AppD-bd1',
-                #     'nodes': ['Node1', 'Node2']
-                # }
-
                 epg_dict['children'] = []
-
 
                 # Iterating EP nodes
                 ep_cnt = 1
@@ -103,7 +95,8 @@ class generateD3Dict(object):
                     for ep_node in ep_nodes:
                         if (ep_node.get('serviceEndpoints')):
                             for sep in ep_node.get('serviceEndpoints'):
-                                sep_list_dict[sep['sepName']] = sep
+                                if sep:
+                                    sep_list_dict[sep['sepName']] = sep
 
                         if (ep_node.get('tierViolations')):
                             for hrv in ep_node.get('tierViolations'):
@@ -113,18 +106,11 @@ class generateD3Dict(object):
                         'IP': epg_ip,
                         'Interfaces': list(set([x['Interfaces'][0] for x in ep_nodes])),
                         'ServiceEndpoints': sep_list_dict.values(),
-                        # 'ServiceEndpoints': {x['serviceEndpoints'][0]['Name']: x for x in ep_nodes}.values(),
-                        'HealthRuleViolations': hrv_list_dict.values(), #list(set([(x['tierViolations']) for x in ep_nodes])),  # json.loads
-                        'Tier-Health': ep_nodes[0]['tierHealth']
+                        'HealthRuleViolations': hrv_list_dict.values(),
+                        'Tier-Health': ep_nodes[0]['tierHealth'],
+                        'VMM-Domain': ep_nodes[0]['VMM-Domain']
                     }
 
-                    # ep_dict['attributes'] = {
-                    #     'IP': '10.0.9.9',
-                    #     'Interfaces': ["topology/pod-1/paths-101/pathep-[eth1/15]"],
-                    #     'ServiceEndpoints': [
-                    #         {'Total Errors': -1, 'type': 'SERVLET', 'Errors/Min': -1, 'Error Percentage': 0.0,
-                    #          'sep': '/cart/services'}]
-                    # }
                     ep_dict['children'] = []
 
                     # Iterating nodes
