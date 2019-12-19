@@ -26,7 +26,7 @@ FAULTS_QUERY = 'rsp-subtree-include=fault-records,no-scoped,subtree'
 EVENTS_QUERY = 'rsp-subtree-include=event-logs,no-scoped,subtree'
 
 #AppD Urls
-
+#All urls containing "/restui" are non documented Appd API
 APPD_LOGIN_URL = '{0}:{1}/controller/auth?action=login'
 APP_HEALTH_URL = '{0}:{1}/controller/restui/app/list/ids'
 APP_HEALTH_URL_V1 = '{0}:{1}/controller/restui/v1/app/list/ids'

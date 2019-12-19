@@ -210,7 +210,7 @@ def get_mapping_dict_target_cluster(mapped_objects):
                     target.append({'domainName': entry.get('domainName'), 'ipaddress': map_object.get('ipaddress'), 'disabled': False})
                 elif 'macaddress' in map_object:
                     logger.debug("Mapping found with macaddress for "+str(map_object))
-                    target.append({'domainName': entry.get('domainName'), 'macaddress': map_object.get('macaddress'), 'disabled': False})
+                    target.append({'domainName': entry.get('domainName'), 'macaddress': map_object.get('macaddress').upper(), 'disabled': False})
     return target
 
 @app.route('/mapping.json', methods=['GET'])
@@ -973,9 +973,9 @@ def merge_aci_appd(tenant, appDId, aci_util_obj):
                         mapping_key = 'macaddress'
                         aci_key = 'CEP-Mac'
                     
-                    if aci[aci_key] == each[mapping_key] and each['domainName'] == str(aci['dn']):
+                    if aci.get(aci_key) and each.get(mapping_key) and aci.get(aci_key).upper() == each.get(mapping_key).upper() and each['domainName'] == str(aci['dn']):
                         # Change based on IP and Mac
-                        appd_data = get_appD(appDId, aci[aci_key])
+                        appd_data = get_appD(appDId, aci.get(aci_key).upper())
                         if appd_data:
                             for each in appd_data:
                                 each.update(aci)
