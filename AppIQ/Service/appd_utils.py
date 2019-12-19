@@ -264,7 +264,8 @@ class AppD(object):
                 if node_mac_details_response.json():
                     for all_data in node_mac_details_response.json():
                         for interface in all_data.get('networkInterfaces'):
-                            mac.append(str(interface['macAddress']))
+                            mac_address = str(interface['macAddress']) 
+                            mac.append(mac_address.upper())
             else:
                 if retry == 1:
                     self.check_connection()
