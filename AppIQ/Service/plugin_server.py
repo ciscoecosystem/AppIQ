@@ -7,11 +7,12 @@ import datetime
 import aci_utils
 import appd_utils
 import alchemy as database
-import generate_d3 as d3
+import consul_generate_d3 as d3
 import RecommendedDNObjects as Recommend
 from flask import Flask
 from multiprocessing import Process, Value
 from custom_logger import CustomLogger
+import consul_merge # TODO: 
 
 app = Flask(__name__, template_folder="../UIAssets", static_folder="../UIAssets/public")
 app.debug = True
@@ -925,7 +926,7 @@ def tree(tenant, appId):
         logger.info('UI Action TREE started')
         aci_util_obj = aci_utils.ACI_Utils()
         mapping(tenant, appId)
-        merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
+        merged_data = consul_merge.merge_aci_consul(tenant, 'data_centre', aci_util_obj)
         response = json.dumps(d3Object.generate_d3_compatible_dict(merged_data))
         return json.dumps({"instanceName":get_instance_name(),"payload": response, "status_code": "200", "message": "OK"})
     except Exception as e:
