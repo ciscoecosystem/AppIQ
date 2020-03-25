@@ -251,7 +251,7 @@ class Container extends Component {
     render() {
         console.log("Container : " + this.reload);
         let title = " | Details";
-        let apptext = " Datacenter";
+        let apptext = " " + result['appId'];
 
         let noEndpointsElement = null;
         if (this.state.data.length) {

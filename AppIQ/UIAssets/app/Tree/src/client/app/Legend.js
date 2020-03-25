@@ -32,9 +32,9 @@ var legend = [
     trans: 2
   },
   {
-    name: "Node",
+    name: "Service",
     level: "#C5D054",
-    label: "Node",
+    label: "Service",
     type: "#C5D054",
     trans: 2.9
   }

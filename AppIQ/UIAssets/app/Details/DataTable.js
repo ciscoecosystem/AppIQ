@@ -77,9 +77,11 @@ export default class DataTable extends Component {
       {
         Header: "Node checks",
         accessor: "nodeChecks",
+        width: 150,
         Cell: row => {
             return (<span>
               {(row.value.passing !== undefined) && (<span> <Icon size="icon-small" type=" icon-check-square" style={{ color: successColor }}></Icon>&nbsp;{row.value.passing}&nbsp;&nbsp;</span>)} 
+              {(row.value.warning !== undefined) && (<span> <Icon size="icon-small" type=" icon-warning" style={{ color: warningColor }}></Icon>&nbsp;{row.value.warning}&nbsp;&nbsp;</span>)}
               {(row.value.failing !== undefined) && (<span> <Icon size="icon-small" type=" icon-exit-contain" style={{ color: failColor }}></Icon>&nbsp;{row.value.failing} </span>)}
             </span>)
         }
@@ -112,6 +114,7 @@ export default class DataTable extends Component {
         Cell: row => {
           return (<span>
             {(row.value.passing !== undefined) && (<span> <Icon size="icon-small" type=" icon-check-square" style={{ color: successColor }}></Icon>&nbsp;{row.value.passing}&nbsp;&nbsp;</span>)} 
+            {(row.value.warning !== undefined) && (<span> <Icon size="icon-small" type=" icon-warning" style={{ color: warningColor }}></Icon>&nbsp;{row.value.warning}&nbsp;&nbsp;</span>)}
             {(row.value.failing !== undefined) && (<span> <Icon size="icon-small" type=" icon-exit-contain" style={{ color: failColor }}></Icon>&nbsp;{row.value.failing} </span>)}
           </span>)
         }
@@ -145,6 +148,7 @@ export default class DataTable extends Component {
                 data={row.original.services}
                 columns={this.state.serviceColumn}
                 noDataText={"No services found"}
+                add   defaultPageSize={100}
                 minRows={0}
                 showPagination={false} />
             )
