@@ -127,12 +127,13 @@ def get_consul_data(ep):
         list_of_nodes = consul_node_list() # here data should come from db
 
         for node in list_of_nodes:
-            if ep in node.get('NodesIPs'):
+            if ep in node.get('nodesIPs'):
                 consul_data.append({
-                    'nodeId': node.get('NodeID'),
-                    'nodeName': node.get('NodeName'),
-                    'ipAddressList': node.get('NodesIPs'),
-                    'services': consul_nodes_services(node.get('NodeName'))
+                    'nodeId': node.get('nodeID'),
+                    'nodeName': node.get('nodeName'),
+                    'ipAddressList': node.get('nodesIPs'),
+                    'nodeCheck': consul_node_check(node.get('nodeName')),
+                    'services': consul_nodes_services(node.get('nodeName'))
                 })
         return consul_data
     except Exception as e:
@@ -374,29 +375,25 @@ def consul_node_list():
     """
     
     node_list = []
-    try:
-        catalog_nodes = requests.get('{}/v1/catalog/nodes'.format('http://10.23.239.14:8500'))
-        nodes = json.loads(catalog_nodes.content)
-        logger.debug(str(nodes))
-        for node in nodes:
-            ip_list = []
-            ip_list.append(node.get('Address', ''))
-            if node.get('TaggedAddresses', {}):
-                ip_list.append(node.get('TaggedAddresses', {}).get('wan_ipv4', ''))
-                ip_list.append(node.get('TaggedAddresses', {}).get('wan', ''))
-                ip_list.append(node.get('TaggedAddresses', {}).get('lan', ''))
-                ip_list.append(node.get('TaggedAddresses', {}).get('lan_ipv4', ''))
+    catalog_nodes = requests.get('{}/v1/catalog/nodes'.format('http://10.23.239.14:8500'))
+    nodes = json.loads(catalog_nodes.content)
+    # logger.debug(str(nodes))
+    for node in nodes:
+        ip_list = []
+        ip_list.append(node.get('Address', ''))
+        if node.get('TaggedAddresses', {}):
+            ip_list.append(node.get('TaggedAddresses', {}).get('wan_ipv4', ''))
+            ip_list.append(node.get('TaggedAddresses', {}).get('wan', ''))
+            ip_list.append(node.get('TaggedAddresses', {}).get('lan', ''))
+            ip_list.append(node.get('TaggedAddresses', {}).get('lan_ipv4', ''))
 
-            node_list.append({
-                'NodeID': node.get('ID', ''),
-                'NodeName': node.get('Node', ''),
-                'NodesIPs': list(set(ip_list)),
-            })
+        node_list.append({
+            'nodeID': node.get('ID', ''),
+            'nodeName': node.get('Node', ''),
+            'nodesIPs': list(set(ip_list)),
+        })
 
-        return node_list
-        
-    except Exception as e:
-        logger.error('Error ' + str(e))
+    return node_list
 
 
 def consul_nodes_services(node_name):
@@ -408,11 +405,82 @@ def consul_nodes_services(node_name):
 
     service_list = []
     for service in services_resp.get('Services'):
+        s_check = consul_service_check(service.get('Service'))
+        s_tags = consul_service_tags(service.get('Service'))
         service_list.append({
-            'ServiceID': service.get('ID', ''),
-            'ServiceName': service.get('Service', ''),
-            'ServiceIP': service.get('Address', ''),
-            'ServicePort': service.get('Port', ''),
+            'serviceInstance': service.get('ID', ''),
+            'service': service.get('Service', ''),
+            'serviceIP': service.get('Address', ''),
+            'port': service.get('Port', ''),
+            'serviceChecks': s_check,
+            'serviceTags': s_tags
         })
 
     return service_list
+
+
+def consul_service_check(service_name):
+    """This will return the dict of services health(and numbers) check"""
+
+    service_resp = requests.get('{}/v1/health/checks/{}'.format('http://10.23.239.14:8500', service_name))
+    service_resp = json.loads(service_resp.content)
+
+    check_dict = {}
+    for check in service_resp:
+        if check.get('Status'):
+            if 'passing' == check.get('Status').lower():
+                if check.get('passing'):
+                    check_dict['passing'] += 1
+                else:
+                    check_dict['passing'] = 1
+            elif 'warning' == check.get('Status').lower():
+                if check.get('warning'):
+                    check_dict['warning'] += 1
+                else:
+                    check_dict['warning'] = 1
+            else:
+                if check.get('failing'):
+                    check_dict['failing'] += 1
+                else:
+                    check_dict['failing'] = 1
+
+    return check_dict
+
+
+def consul_service_tags(service_name):
+
+    service_resp = requests.get('{}/v1/catalog/service/{}'.format('http://10.23.239.14:8500', service_name))
+    service_resp = json.loads(service_resp.content)
+
+    tags_set = set()
+    for val in service_resp[0].get('ServiceTags'):
+        tags_set.add(val)
+
+    return list(tags_set)
+
+
+def consul_node_check(node_name):
+
+    node_resp = requests.get('{}/v1/health/node/{}'.format('http://10.23.239.14:8500', node_name))
+    node_resp = json.loads(node_resp.content)
+
+    check_dict = {}
+    for check in node_resp:
+        if check.get('Status'):
+            if 'passing' == check.get('Status').lower():
+                if check.get('passing'):
+                    check_dict['passing'] += 1
+                else:
+                    check_dict['passing'] = 1
+            elif 'warning' == check.get('Status').lower():
+                if check.get('warning'):
+                    check_dict['warning'] += 1
+                else:
+                    check_dict['warning'] = 1
+            else:
+                if check.get('failing'):
+                    check_dict['failing'] += 1
+                else:
+                    check_dict['failing'] = 1
+
+    return check_dict

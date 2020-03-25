@@ -1129,31 +1129,32 @@ def get_details(tenant, appId):
         start_time = datetime.datetime.now()
         logger.info("UI Action details.json started")
         
-        aci_util_obj = aci_utils.ACI_Utils()
+        # aci_util_obj = aci_utils.ACI_Utils()
 
-        details_list = []
+        # details_list = []
         
-        mapping(tenant, appId)
-        merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
-        #get_to_Epg_traffic("uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-Ord")
+        # mapping(tenant, appId)
+        # merged_data = merge_aci_appd(tenant, appId, aci_util_obj)
+        # #get_to_Epg_traffic("uni/tn-AppDynamics/ap-AppD-AppProfile1/epg-AppD-Ord")
 
-        for each in merged_data:
-            epg_health = aci_util_obj.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
-            node = get_node_from_interface(each['Interfaces'])
-            interfaces = get_all_interfaces(each['Interfaces']) 
-            details_list.append({
-                    'IP': each.get('IP'),
-                    'epgName': each.get('EPG'),
-                    'epgHealth': epg_health,
-                    'endPointName': each.get('VM-Name'),
-                    'tierName': each.get('tierName'),
-                    'tierHealth': each.get('tierHealth'),
-                    'dn': each.get('dn'),
-                    'mac': each.get('CEP-Mac'),
-                    'interface': str(interfaces),
-                    'node': str(node)
-                })
-        logger.info("UI Action details.json ended")
+        # for each in merged_data:
+        #     epg_health = aci_util_obj.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
+        #     node = get_node_from_interface(each['Interfaces'])
+        #     interfaces = get_all_interfaces(each['Interfaces']) 
+        #     details_list.append({
+        #             'IP': each.get('IP'),
+        #             'epgName': each.get('EPG'),
+        #             'epgHealth': epg_health,
+        #             'endPointName': each.get('VM-Name'),
+        #             'tierName': each.get('tierName'),
+        #             'tierHealth': each.get('tierHealth'),
+        #             'dn': each.get('dn'),
+        #             'mac': each.get('CEP-Mac'),
+        #             'interface': str(interfaces),
+        #             'node': str(node)
+        #         })
+        details_list = consul_details(tenant)
+        logger.info("UI Action details.json ended: " + str(details_list))
         details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
         return json.dumps({"instanceName":get_instance_name(),"payload": details, "status_code": "200", "message": "OK"})
     except Exception as e:
@@ -1236,3 +1237,56 @@ def get_all_interfaces(interfaces):
             logger.error("Incompetible format of Interfaces found")
             raise Exception("Incompetible format of Interfaces found")
     return interface_list
+
+
+def consul_details(tenant):
+    try:
+        logger.info("Consul Details start")
+
+        aci_util_obj = aci_utils.ACI_Utils()
+        details_list = []
+        merged_data = consul_merge.merge_aci_consul(tenant, 'data_centre', aci_util_obj)
+        for each in merged_data:
+            epg_health = aci_util_obj.get_epg_health(str(tenant), str(each['AppProfile']), str(each['EPG']))
+            ep_info = get_eps_info(each.get('dn'), each.get('IP'))
+            details_list.append({
+                    'interface': ep_info.get('interface'),
+                    'endPointName': each.get('VM-Name'),
+                    'ip': each.get('IP'),
+                    'mac': each.get('CEP-Mac'),
+                    'learningSource': ep_info.get('learningSource'),
+                    'hostingServer': ep_info.get('hostingServer'),
+                    'reportingController': ep_info.get('reportingController'),
+                    'vrf': each.get('VRF'),
+                    'bd': each.get('BD'),
+                    'ap': each.get('AppProfile'),
+                    'epgName': each.get('EPG'),
+                    'epgHealth': epg_health,
+                    'consulNode': each.get('nodeName'),
+                    'nodeChecks': each.get('nodeCheck'),
+                    'services': each.get('services')
+                })
+        return details_list
+    except Exception as e:
+        logger.exception("Error in consul_details: "+str(e))
+        return []
+
+
+def get_eps_info(dn, ip):
+
+    try:
+        aci_util_obj = aci_utils.ACI_Utils()
+        ep_info_query_string = 'query-target=children&target-subtree-class=fvCEp&query-target-filter=or(eq(fvCEp.ip,"'+ip+'"))&rsp-subtree=children&rsp-subtree-class=fvRsHyper,fvRsCEpToPathEp,fvRsVm'
+        ep = aci_util_obj.get_mo_related_item(dn, ep_info_query_string, "")
+        ep_info = get_ep_info(ep[0].get("fvCEp").get("children"), aci_util_obj)
+        ep_attr = ep[0].get("fvCEp").get("attributes")
+
+        return {
+            'interface': ep_info.get('iface_name'),
+            'learningSource':ep_attr.get("lcC"),
+            'hostingServer': ep_info.get('hosting_server_name'),
+            'reportingController': ep_info.get('ctrlr_name')
+        }
+
+    except Exception as e:
+        logger.exception("Error in get_eps_info: "+str(e))

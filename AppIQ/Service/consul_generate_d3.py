@@ -57,7 +57,7 @@ class generateD3Dict(object):
                 for epg_node in epg_nodes:
                     service_list = epg_node.get("services", {})
                     for service in service_list:
-                        epg_service_list.add(service.get("ServiceID", ""))
+                        epg_service_list.add(service.get("serviceInstance", ""))
 
 
                 epg_dict = {}
@@ -97,7 +97,7 @@ class generateD3Dict(object):
                     # for ep_node in ep_nodes:
                     #     distinct_ep_tiers.add(ep_node['tierName'])
                     for ep_node in ep_nodes:
-                        epg_service_list = [ x["ServiceID"] for x in ep_node["services"]]
+                        epg_service_list = [ x["serviceInstance"] for x in ep_node["services"]]
 
                         ep_dict = {}
                         ep_dict['name'] = "EP"

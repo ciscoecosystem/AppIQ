@@ -3,7 +3,7 @@
         "graphql.json":"GraphQL Json"
     },
     "apicversion":"3.2(1l)",
-    "appid":"AppIQConsul",
+    "appid":"Consul",
     "author":"Nilay Shah, Devarshi Shah",
     "category":[
         "Visibility and Monitoring"
@@ -17,7 +17,7 @@
     "iconfile":"hashicorp-consul.png",
     "insertionURL":"fv:infoTenant:center",
     "metaversion":"1.1",
-    "name":"AppIQConsul",
+    "name":"Consul",
     "permissions":[
         "admin",
         "tenant-connectivity-mgmt",
@@ -33,7 +33,7 @@
         "vmm-connectivity"
     ],
     "permissionslevel":"read",
-    "shortdescr":"The AppIQ app can link together ACI and Consul.",
+    "shortdescr":"The Consul app can link together ACI and Consul.",
     "vendor":"Cisco",
     "vendordomain":"Cisco",
     "version":"1.0"
