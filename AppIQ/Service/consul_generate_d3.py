@@ -61,7 +61,7 @@ class generateD3Dict(object):
                 epg_dict['fraction'] = epg_nodes[0]['fraction']
                 epg_dict['type'] = '#085A87'
                 epg_dict['sub_label'] = epg_nodes[0]['EPG']
-                epg_dict['label'] = epg_service_list[0] + ", ..." #",".join(epg_service_list)
+                epg_dict['label'] = list(epg_service_list)[0] + ", ..." #",".join(epg_service_list)
                 epg_dict['attributes'] = {
                     # 'VRF': epg_nodes[0]['VRF'],
                     # 'BD': epg_nodes[0]['BD'],
@@ -69,26 +69,12 @@ class generateD3Dict(object):
                     # 'Nodes': list(set([x['nodeName'] for x in epg_nodes])),
                 }
 
-                # if 'Machine Agent Enabled' in epg_nodes[0]:
-                #     epg_dict['attributes']['Machine Agent Enabled'] = 'True'
-
                 epg_dict['children'] = []
-
-                # Iterating EP nodes
-                ep_cnt = 1
-                # Implement NonIPs
-
-
 
                 for epg_ip in distinct_epg_ips:
                     # distinct_ep_tiers = set()
                     ep_nodes = filter(lambda x: x['IP'] == epg_ip, epg_nodes)
-                    
-                    
 
-
-                    # for ep_node in ep_nodes:
-                    #     distinct_ep_tiers.add(ep_node['tierName'])
                     for ep_node in ep_nodes:
                         epg_service_list = [ x["serviceInstance"] for x in ep_node["services"]]
 
@@ -98,19 +84,6 @@ class generateD3Dict(object):
                         ep_dict['sub_label'] = ep_nodes[0]['VM-Name']
                         ep_dict['label'] =  ep_node["nodeName"] #",".join(epg_service_list)
 
-
-                    # sep_list_dict = {}
-                    # hrv_list_dict = {}
-                    # for ep_node in ep_nodes:
-                    #     if (ep_node.get('serviceEndpoints')):
-                    #         for sep in ep_node.get('serviceEndpoints'):
-                    #             if sep:
-                    #                 sep_list_dict[sep['sepName']] = sep
-
-                    #     if (ep_node.get('tierViolations')):
-                    #         for hrv in ep_node.get('tierViolations'):
-                    #             if hrv:#.get('Violation Id'):
-                    #                 hrv_list_dict[hrv['Violation Id']] = hrv
                         ep_dict['attributes'] = {
                             # 'IP': ep_node['IP'],
                             # 'Interfaces': list(set([x['Interfaces'][0] for x in ep_nodes])),
@@ -118,31 +91,16 @@ class generateD3Dict(object):
                         }
 
                         ep_dict['children'] = []
-
-                        node_dict = {}
-                        node_dict['type'] = '#C5D054'
-                        node_dict['label'] = ep_node['nodeName']
-                        node_dict['attributes'] = {}
-                        ep_dict['children'].append(node_dict)
+                        for service in ep_node["services"]:
+                            node_dict = {}
+                            node_dict['name'] = "Service"
+                            node_dict['type'] = '#C5D054'
+                            node_dict['label'] = service['serviceInstance']
+                            node_dict['attributes'] = {}
+                            ep_dict['children'].append(node_dict)
+                        
                         epg_dict['children'].append(ep_dict)
 
-
-                    # Iterating nodes
-                    # node_cnt = 1
-                    # for ep_node in ep_nodes:
-                    #     node_dict = {}
-                    #     node_dict['name'] = "Node"
-                    #     node_dict['type'] = '#C5D054'
-                    #     node_dict['level'] = self.health_colour(ep_node['nodeHealth'])
-                    #     node_dict['label'] = ep_node['nodeName']
-                    #     node_dict['attributes'] = {
-                    #         'Node-Health': ep_node['nodeHealth']
-                    #     }
-                    #     ep_dict['children'].append(node_dict)
-                    #     node_cnt += 1
-
-                    # epg_dict['children'].append(ep_dict)
-                    # ep_cnt += 1
                 if epg_nodes[0]['Non_IPs']:
                     non_ep_dict={}
                     non_ep_dict['name'] = 'EP'
