@@ -1155,8 +1155,8 @@ def get_details(tenant, appId):
         #         })
         details_list = consul_details(tenant)
         logger.info("UI Action details.json ended: " + str(details_list))
-        details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
-        return json.dumps({"instanceName":get_instance_name(),"payload": details, "status_code": "200", "message": "OK"})
+        # details = [dict(t) for t in set([tuple(d.items()) for d in details_list])]
+        return json.dumps({"instanceName":get_instance_name(),"payload": details_list, "status_code": "200", "message": "OK"})
     except Exception as e:
         logger.exception("Could not load the Details. Error: "+str(e))
         return json.dumps({"payload": {}, "status_code": "300", "message": "Could not load the Details."})

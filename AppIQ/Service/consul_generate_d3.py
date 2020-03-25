@@ -27,13 +27,9 @@ class generateD3Dict(object):
             app_prof_node = {}
             app_prof_node['name'] = 'AppProf'
             app_prof_node['type'] = '#581552'
-            app_prof_node['level'] = "green" # self.health_colour(app_nodes[0]['appHealth'])##
             app_prof_node['label'] = "abc" # app_nodes[0]['appName']##
             app_prof_node['sub_label'] = app_nodes[0]['AppProfile']
-            app_prof_node['attributes'] = {
-                # TODO
-                'App-Health': "abc" # str(app_nodes[0]['appHealth'])  # Changed by Nilay    ####
-            }
+            app_prof_node['attributes'] = {}
             app_prof_node['children'] = []
 
             # 2nd layer nodes in Tree (EPG)
@@ -64,100 +60,47 @@ class generateD3Dict(object):
                 epg_dict['name'] = "EPG"
                 epg_dict['fraction'] = epg_nodes[0]['fraction']
                 epg_dict['type'] = '#085A87'
-                epg_dict['level'] = "green" # self.health_colour(epg_nodes[0]['tierHealth'])  # Changed by Nilay
                 epg_dict['sub_label'] = epg_nodes[0]['EPG']
-                epg_dict['label'] = ",".join(epg_service_list)
+                epg_dict['label'] = list(epg_service_list)[0] + ", ..." #",".join(epg_service_list)
                 epg_dict['attributes'] = {
-                    'VRF': epg_nodes[0]['VRF'],
-                    'BD': epg_nodes[0]['BD'],
-                    'Contracts': epg_nodes[0]['Contracts'],
-                    # 'Contracts' : list(set([x['Contracts'][0] for x in epg_nodes if len(x['Contracts']) > 0])), #if len(x['Contracts']) > 0 else ['None']
-                    'Nodes': list(set([x['nodeName'] for x in epg_nodes])),
-                    'Tier-Health': "abc" # epg_nodes[0]['tierHealth']
+                    # 'VRF': epg_nodes[0]['VRF'],
+                    # 'BD': epg_nodes[0]['BD'],
+                    # 'Contracts': epg_nodes[0]['Contracts'],
+                    # 'Nodes': list(set([x['nodeName'] for x in epg_nodes])),
                 }
 
-                if 'Machine Agent Enabled' in epg_nodes[0]:
-                    epg_dict['attributes']['Machine Agent Enabled'] = 'True'
-
                 epg_dict['children'] = []
-
-                # Iterating EP nodes
-                ep_cnt = 1
-                # Implement NonIPs
-
-
 
                 for epg_ip in distinct_epg_ips:
                     # distinct_ep_tiers = set()
                     ep_nodes = filter(lambda x: x['IP'] == epg_ip, epg_nodes)
-                    
-                    
 
-
-                    # for ep_node in ep_nodes:
-                    #     distinct_ep_tiers.add(ep_node['tierName'])
                     for ep_node in ep_nodes:
                         epg_service_list = [ x["serviceInstance"] for x in ep_node["services"]]
 
                         ep_dict = {}
                         ep_dict['name'] = "EP"
                         ep_dict['type'] = '#2DBBAD'
-                        ep_dict['level'] = "green" # self.health_colour(ep_nodes[0]['tierHealth'])
                         ep_dict['sub_label'] = ep_nodes[0]['VM-Name']
-                        ep_dict['label'] = ",".join(epg_service_list)
+                        ep_dict['label'] =  ep_node["nodeName"] #",".join(epg_service_list)
 
-
-                    # sep_list_dict = {}
-                    # hrv_list_dict = {}
-                    # for ep_node in ep_nodes:
-                    #     if (ep_node.get('serviceEndpoints')):
-                    #         for sep in ep_node.get('serviceEndpoints'):
-                    #             if sep:
-                    #                 sep_list_dict[sep['sepName']] = sep
-
-                    #     if (ep_node.get('tierViolations')):
-                    #         for hrv in ep_node.get('tierViolations'):
-                    #             if hrv:#.get('Violation Id'):
-                    #                 hrv_list_dict[hrv['Violation Id']] = hrv
                         ep_dict['attributes'] = {
-                            'IP': ep_node['IP'],
-                            'Interfaces': list(set([x['Interfaces'][0] for x in ep_nodes])),
-                            'ServiceEndpoints': 'abc', # sep_list_dict.values(),
-                            'HealthRuleViolations': 'abc', # hrv_list_dict.values(),
-                            'Tier-Health': 'abc', # ep_nodes[0]['tierHealth'],
-                            'VMM-Domain': ep_nodes[0]['VMM-Domain']
+                            # 'IP': ep_node['IP'],
+                            # 'Interfaces': list(set([x['Interfaces'][0] for x in ep_nodes])),
+                            # 'VMM-Domain': ep_nodes[0]['VMM-Domain']
                         }
 
                         ep_dict['children'] = []
-
-                        node_dict = {}
-                        node_dict['name'] = "Node"
-                        node_dict['type'] = '#C5D054'
-                        node_dict['level'] = "green" # self.health_colour(ep_node['nodeHealth'])
-                        node_dict['label'] = ep_node['nodeName']
-                        node_dict['attributes'] = {
-                            'Node-Health': "abc" # ep_node['nodeHealth']
-                        }
-                        ep_dict['children'].append(node_dict)
+                        for service in ep_node["services"]:
+                            node_dict = {}
+                            node_dict['name'] = "Service"
+                            node_dict['type'] = '#C5D054'
+                            node_dict['label'] = service['serviceInstance']
+                            node_dict['attributes'] = {}
+                            ep_dict['children'].append(node_dict)
+                        
                         epg_dict['children'].append(ep_dict)
 
-
-                    # Iterating nodes
-                    # node_cnt = 1
-                    # for ep_node in ep_nodes:
-                    #     node_dict = {}
-                    #     node_dict['name'] = "Node"
-                    #     node_dict['type'] = '#C5D054'
-                    #     node_dict['level'] = self.health_colour(ep_node['nodeHealth'])
-                    #     node_dict['label'] = ep_node['nodeName']
-                    #     node_dict['attributes'] = {
-                    #         'Node-Health': ep_node['nodeHealth']
-                    #     }
-                    #     ep_dict['children'].append(node_dict)
-                    #     node_cnt += 1
-
-                    # epg_dict['children'].append(ep_dict)
-                    # ep_cnt += 1
                 if epg_nodes[0]['Non_IPs']:
                     non_ep_dict={}
                     non_ep_dict['name'] = 'EP'
