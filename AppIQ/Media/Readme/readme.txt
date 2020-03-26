@@ -9,17 +9,26 @@ AppDynamics Controller version 4.4 or above (on-prem and SaaS supported)
 Application monitored by AppDynamics Controller should be running on ACI fabric managed by the APIC cluster on which AppIQ is installed
 
 
+WHAT'S NEW?
+
+- Support for L2 BD. This allows the MAC based ACI endpoint to application node corelation. You will need AppDynamics Machine Agent to be enabled in your AppDynamics Controller
+
+- Revamped UI with stylesheets of ACI 4.2
+
+- Contextual Operational Trobuleshooting capabilities with operational data which includes audit logs , events, faults, health rule violations, contract hits,etc. 
+
+
 HOWTO:
 Login
 Once the AppIQ has been enabled, Navigate to the tenant in which the application Endpoints are present. AppIQ will show up as a tab on the far right of the menu bar.
 To login Enter the following information:
 
-Property 			Description
-AppDynamics 		Controller The AppDynamics controller IP address.
-Controller Port 	The running port identifier.
-User 				The controller user name.
-Account 			The tenant user account name.
-Password 			The tenant user account password.
+Property: 			Description
+AppDynamics 		Controller: The AppDynamics controller IP address.
+Controller Port: 	The running port identifier.
+User: 				The controller user name.
+Account: 			The tenant user account name.
+Password: 			The tenant user account password.
 
 Once the credentials are input correctly, you will see a list of applications on the AppDynamics controller available to view for the above user.
 Each application will have "Details", "Mapping" and "View"
