@@ -406,14 +406,15 @@ def consul_nodes_services(node_name):
     service_list = []
     for service in services_resp.get('Services'):
         s_check = consul_service_check(service.get('Service'))
-        s_tags = consul_service_tags(service.get('Service'))
+        s_tags, s_kind = consul_service_tags_kind(service.get('Service'))
         service_list.append({
             'serviceInstance': service.get('ID', ''),
             'service': service.get('Service', ''),
             'serviceIP': service.get('Address', ''),
             'port': service.get('Port', ''),
             'serviceChecks': s_check,
-            'serviceTags': s_tags
+            'serviceTags': s_tags,
+            'serviceKind': s_kind
         })
 
     return service_list
@@ -447,7 +448,7 @@ def consul_service_check(service_name):
     return check_dict
 
 
-def consul_service_tags(service_name):
+def consul_service_tags_kind(service_name):
 
     service_resp = requests.get('{}/v1/catalog/service/{}'.format('http://10.23.239.14:8500', service_name))
     service_resp = json.loads(service_resp.content)
@@ -456,7 +457,9 @@ def consul_service_tags(service_name):
     for val in service_resp[0].get('ServiceTags'):
         tags_set.add(val)
 
-    return list(tags_set)
+    service_kind = service_resp[0].get('ServiceKind')
+
+    return list(tags_set), service_kind
 
 
 def consul_node_check(node_name):

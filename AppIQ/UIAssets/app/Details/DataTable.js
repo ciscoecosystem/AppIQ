@@ -102,6 +102,10 @@ export default class DataTable extends Component {
         accessor: "port"
       },
       {
+        Header: "Service Kind",
+        accessor: "serviceKind"
+      },
+      {
         Header: "Service Tags",
         accessor: "serviceTags",
         Cell: row => {

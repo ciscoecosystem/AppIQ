@@ -95,7 +95,10 @@ class generateD3Dict(object):
                             node_dict = {}
                             node_dict['name'] = "Service"
                             node_dict['type'] = '#C5D054'
-                            node_dict['label'] = service['serviceInstance']
+                            if len(service['serviceInstance']) > 11:
+                                node_dict['label'] = service['serviceInstance'][:11] + '..'
+                            else:
+                                node_dict['label'] = service['serviceInstance']
                             node_dict['attributes'] = {}
                             ep_dict['children'].append(node_dict)
                         
