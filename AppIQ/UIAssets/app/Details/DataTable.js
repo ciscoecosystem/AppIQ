@@ -5,6 +5,7 @@ import tablestyle from "./tablestyle.css"
 
 const successColor = "#6ebe4a";
 const failColor = "#e2231a";
+const warningColor = "#f49141";
 
 
 export default class DataTable extends Component {
@@ -59,7 +60,7 @@ export default class DataTable extends Component {
         Header: "EPG Health",
         accessor: "epgHealth",
         Cell: row => {
-          console.log("== row", row);
+
           let epgcolor = "56b72a";
           if (row.value < 70) {
             epgcolor = "#ffcc00";
@@ -79,11 +80,11 @@ export default class DataTable extends Component {
         accessor: "nodeChecks",
         width: 150,
         Cell: row => {
-            return (<span>
-              {(row.value.passing !== undefined) && (<span> <Icon size="icon-small" type=" icon-check-square" style={{ color: successColor }}></Icon>&nbsp;{row.value.passing}&nbsp;&nbsp;</span>)} 
-              {(row.value.warning !== undefined) && (<span> <Icon size="icon-small" type=" icon-warning" style={{ color: warningColor }}></Icon>&nbsp;{row.value.warning}&nbsp;&nbsp;</span>)}
-              {(row.value.failing !== undefined) && (<span> <Icon size="icon-small" type=" icon-exit-contain" style={{ color: failColor }}></Icon>&nbsp;{row.value.failing} </span>)}
-            </span>)
+          return (<span>
+            {(row.value.passing !== undefined) && (<span> <Icon size="icon-small" type=" icon-check-square" style={{ color: successColor }}></Icon>&nbsp;{row.value.passing}&nbsp;&nbsp;</span>)}
+            {(row.value.warning !== undefined) && (<span> <Icon size="icon-small" type=" icon-warning" style={{ color: warningColor }}></Icon>&nbsp;{row.value.warning}&nbsp;&nbsp;</span>)}
+            {(row.value.failing !== undefined) && (<span> <Icon size="icon-small" type=" icon-exit-contain" style={{ color: failColor }}></Icon>&nbsp;{row.value.failing} </span>)}
+          </span>)
         }
       }
     ]
@@ -117,7 +118,7 @@ export default class DataTable extends Component {
         accessor: "serviceChecks",
         Cell: row => {
           return (<span>
-            {(row.value.passing !== undefined) && (<span> <Icon size="icon-small" type=" icon-check-square" style={{ color: successColor }}></Icon>&nbsp;{row.value.passing}&nbsp;&nbsp;</span>)} 
+            {(row.value.passing !== undefined) && (<span> <Icon size="icon-small" type=" icon-check-square" style={{ color: successColor }}></Icon>&nbsp;{row.value.passing}&nbsp;&nbsp;</span>)}
             {(row.value.warning !== undefined) && (<span> <Icon size="icon-small" type=" icon-warning" style={{ color: warningColor }}></Icon>&nbsp;{row.value.warning}&nbsp;&nbsp;</span>)}
             {(row.value.failing !== undefined) && (<span> <Icon size="icon-small" type=" icon-exit-contain" style={{ color: failColor }}></Icon>&nbsp;{row.value.failing} </span>)}
           </span>)
@@ -137,6 +138,12 @@ export default class DataTable extends Component {
     this.setState({ loading: newprops.loading })
     this.setState({ row: newprops.data })
   }
+
+  CONSUL_handleRowExpanded(newExpanded, index, event) {
+    // we override newExpanded, keeping only current selected row expanded
+    this.props.setExpand(index[0])
+  }
+  
   render() {
     return (
       <div>
@@ -146,13 +153,16 @@ export default class DataTable extends Component {
           noDataText="No endpoints found for the given Application in the given Tenant."
           data={this.state.row}
           columns={this.state.columns}
+          onPageChange={() => this.props.resetExpanded()}
+          expanded={this.props.expanded}
+          onExpandedChange={(newExpanded, index, event) => this.CONSUL_handleRowExpanded(newExpanded, index, event)}
           SubComponent={row => {
             return (
               <Table
                 data={row.original.services}
                 columns={this.state.serviceColumn}
                 noDataText={"No services found"}
-                add   defaultPageSize={100}
+                defaultPageSize={100}
                 minRows={0}
                 showPagination={false} />
             )
