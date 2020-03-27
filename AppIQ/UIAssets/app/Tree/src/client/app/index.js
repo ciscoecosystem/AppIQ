@@ -2,6 +2,7 @@ import React from 'react';
 import { render } from 'react-dom';
 import TestComponent from './TestComponent.js';
 import Header from './Header.js'
+import { TREE_VIEW_QUERY_PAYLOAD } from "../../../../../constants.js"
 
 var treedata;
 var key = 0;
@@ -50,7 +51,13 @@ function getData(asyncCall) {
     );
     let result = urlParams;
 
-    let payload = { query: 'query{Run(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){response}}' }
+    try{
+    this.setState({ result })
+    } catch(err){
+      console.error("set state error", err);
+    }
+    let payload = TREE_VIEW_QUERY_PAYLOAD(result['tn'])
+    // let payload = { query: 'query{Run(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){response}}' }
     let xhr = new XMLHttpRequest();
     let url = document.location.origin + "/appcenter/Cisco/AppIQ/graphql.json";
 	
@@ -87,7 +94,7 @@ function getData(asyncCall) {
                         else {
                             // Success
                             var treedata_raw = JSON.parse(json.data.Run.response).payload;
-                            headerInstanceName = JSON.parse(json.data.Run.response).instanceName;
+                            headerInstanceName = JSON.parse(json.data.Run.response).agentIP; //  CONSUL : change from instanceName to agentIp
                             treedata = JSON.parse(treedata_raw);
                         }
                     }
@@ -500,6 +507,7 @@ class App extends React.Component {
         super(props);
         this.state = {
             reloadCount : 0,
+            result: {}
         }
 
         this.reload = this.reload.bind(this);
@@ -525,7 +533,7 @@ class App extends React.Component {
 
       loadingBoxHide();
 
-      let apptext = " List of Applications";
+      let apptext = " " + this.state.result[PROFILE_NAME]; // CONSUL changes
       let title = " | View"
       
       if (bool) {
