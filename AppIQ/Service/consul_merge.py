@@ -52,18 +52,19 @@ def merge_aci_consul(tenant, data_center, aci_util_obj):
                     if aci.get(aci_key) and each.get(mapping_key) and aci.get(aci_key).upper() == each.get(mapping_key).upper() and each['domainName'] == str(aci['dn']):
                         # Service to CEp mapping
                         for node in consul_data:
-                            new_node = {
-                                'nodeId': node.get('nodeId'),
-                                'nodeName': node.get('nodeName'),
-                                'ipAddressList': node.get('ipAddressList'),
-                                'nodeCheck': node.get('nodeCheck'),
-                                'services': []
-                            }
-                            for service in node.get('services', []):
-                                if aci.get(aci_key).upper() == service.get('serviceIP'):
-                                    logger.debug("===========Match Service IP: {}".format(service.get('serviceIP')))
-                                    node['services'].remove(service)
-                                    new_node['services'].append(service)
+                            if aci.get(aci_key).upper() not in node.get('ipAddressList'):
+                                new_node = {
+                                    'nodeId': node.get('nodeId'),
+                                    'nodeName': node.get('nodeName'),
+                                    'ipAddressList': node.get('ipAddressList'),
+                                    'nodeCheck': node.get('nodeCheck'),
+                                    'services': []
+                                }
+                                services_with_ip = [service for service in node.get('services', []) if aci.get(aci_key).upper() == service.get('serviceIP') ]
+                                if services_with_ip:
+                                    for service in services_with_ip:
+                                        node['services'].remove(service)
+                                        new_node['services'].append(service)
                                     new_node.update(aci)
                                     merge_list.append(new_node)
                                     if aci[aci_key] not in merged_eps:
@@ -72,8 +73,8 @@ def merge_aci_consul(tenant, data_center, aci_util_obj):
                                             merged_epg_count[aci['EPG']] = [aci[aci_key]]
                                         else:
                                             merged_epg_count[aci['EPG']].append(aci[aci_key])
-                                else:
-                                    logger.debug("===========NO Match Service IP: {}".format(service.get('serviceIP')))
+
+                        logger.info('Service to CEp mapped:' + str(merge_list))
 
                         # node to EP mapping
                         mapped_consul_nodes = [node for node in consul_data if aci.get(aci_key).upper() in node.get('ipAddressList', []) and node.get('services', [])]
