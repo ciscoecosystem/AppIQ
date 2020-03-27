@@ -25,13 +25,14 @@ def merge_aci_consul(tenant, data_center, aci_util_obj):
         non_merged_ep_dict = {}
 
         aci_data = aci_util_obj.main(tenant)
+        consul_data = get_consul_data()
+
         # mapping should come from alchemy
         # correlatoin should be part of mapping
-        aci_consul_mappings = correlate_aci_consul(tenant, data_center)
+        aci_consul_mappings = correlate_aci_consul(tenant, data_center, consul_data)
 
         # Changing the data from the correlate_aci_consul(tenant, data_centre)
         aci_consul_mappings = get_mapping_dict_target_cluster(aci_consul_mappings)
-
 
         logger.debug("ACI Data: {}".format(str(aci_data)))
         logger.debug("Mapping Data: {}".format(str(aci_consul_mappings)))
@@ -49,10 +50,35 @@ def merge_aci_consul(tenant, data_center, aci_util_obj):
                     aci_key = 'IP'
 
                     if aci.get(aci_key) and each.get(mapping_key) and aci.get(aci_key).upper() == each.get(mapping_key).upper() and each['domainName'] == str(aci['dn']):
-                        # Change based on IP and Mac
-                        consul_data = get_consul_data(aci.get(aci_key).upper())
-                        if consul_data:
-                            for each in consul_data:
+                        # Service to CEp mapping
+                        for node in consul_data:
+                            new_node = {
+                                'nodeId': node.get('nodeId'),
+                                'nodeName': node.get('nodeName'),
+                                'ipAddressList': node.get('ipAddressList'),
+                                'nodeCheck': node.get('nodeCheck'),
+                                'services': []
+                            }
+                            for service in node.get('services', []):
+                                if aci.get(aci_key).upper() == service.get('serviceIP'):
+                                    logger.debug("===========Match Service IP: {}".format(service.get('serviceIP')))
+                                    node['services'].remove(service)
+                                    new_node['services'].append(service)
+                                    new_node.update(aci)
+                                    merge_list.append(new_node)
+                                    if aci[aci_key] not in merged_eps:
+                                        merged_eps.append(aci[aci_key])
+                                        if aci['EPG'] not in merged_epg_count:
+                                            merged_epg_count[aci['EPG']] = [aci[aci_key]]
+                                        else:
+                                            merged_epg_count[aci['EPG']].append(aci[aci_key])
+                                else:
+                                    logger.debug("===========NO Match Service IP: {}".format(service.get('serviceIP')))
+
+                        # node to EP mapping
+                        mapped_consul_nodes = [node for node in consul_data if aci.get(aci_key).upper() in node.get('ipAddressList', []) and node.get('services', [])]
+                        if mapped_consul_nodes:
+                            for each in mapped_consul_nodes:
                                 each.update(aci)
                                 merge_list.append(each)
                                 if aci[aci_key] not in merged_eps:
@@ -116,7 +142,7 @@ def merge_aci_consul(tenant, data_center, aci_util_obj):
         logger.info("Time for merge_aci_appd: " + str(end_time - start_time))
 
 
-def get_consul_data(ep):
+def get_consul_data():
     """
     This will fetch the data from the API and return for now
     Decide the form of data neede in the merge logic and return as per that.
@@ -127,14 +153,13 @@ def get_consul_data(ep):
         list_of_nodes = consul_node_list() # here data should come from db
 
         for node in list_of_nodes:
-            if ep in node.get('nodesIPs'):
-                consul_data.append({
-                    'nodeId': node.get('nodeID'),
-                    'nodeName': node.get('nodeName'),
-                    'ipAddressList': node.get('nodesIPs'),
-                    'nodeCheck': consul_node_check(node.get('nodeName')),
-                    'services': consul_nodes_services(node.get('nodeName'))
-                })
+            consul_data.append({
+                'nodeId': node.get('nodeID'),
+                'nodeName': node.get('nodeName'),
+                'ipAddressList': node.get('nodesIPs'),
+                'nodeCheck': consul_node_check(node.get('nodeName')),
+                'services': consul_nodes_services(node.get('nodeName'))
+            })
         return consul_data
     except Exception as e:
         logger.exception("Error while merge_aci_data : "+str(e))
@@ -155,7 +180,7 @@ def get_mapping_dict_target_cluster(mapped_objects):
     return target
 
 
-def correlate_aci_consul(tenant, data_center):
+def correlate_aci_consul(tenant, data_center, consul_data):
     """
     Initial algo imp
 
@@ -186,18 +211,21 @@ def correlate_aci_consul(tenant, data_center):
         logger.exception('Exception in parsed eps list, Error: ' + str(e))
         return []
 
-    # Get All the nodes in the data centre
-    consul_nodes = get_data_centre_nodes(data_center)
-    logger.info('Consul IPs: '+str(consul_nodes))
-    if not consul_nodes:
-        logger.exception('Error: appd_nodes is Empty!')
+    if not consul_data:
+        logger.exception('Error: consul_data is Empty!')
         return []
 
     ip_list = []
-    for node in consul_nodes:
-        ip_list.append(node)
+    for node in consul_data:
+        ip_list += node.get('ipAddressList', [])
+        # For fetching ips of services.
+        for service in node.get('services', []):
+            # check ip is not empty string
+            if service.get('serviceIP', ''):
+                ip_list.append(service.get('serviceIP'))
+    ip_list = list(set(ip_list))
 
-    logger.debug('Final IP List ' + str(ip_list))
+    logger.debug('Final Consul IP List ' + str(ip_list))
 
     # Extract common based on Ips
     try:
@@ -238,30 +266,6 @@ def correlate_aci_consul(tenant, data_center):
     else:
         logger.info('Error: Empty generated_list ' + str(generated_list))
         return []
-
-
-def get_data_centre_nodes(data_center):
-    """
-    This should fetch the data from db using the dc field, not directly
-    """
-    
-    ip_list = []
-    try:
-        catalog_nodes = requests.get('{}/v1/catalog/nodes'.format('http://10.23.239.14:8500'))
-        nodes = json.loads(catalog_nodes.content)
-        # print(nodes)
-        for node in nodes:
-            ip_list.append(node.get('Address', ''))
-            if node.get('TaggedAddresses', {}):
-                ip_list.append(node.get('TaggedAddresses', {}).get('wan_ipv4', ''))
-                ip_list.append(node.get('TaggedAddresses', {}).get('wan', ''))
-                ip_list.append(node.get('TaggedAddresses', {}).get('lan', ''))
-                ip_list.append(node.get('TaggedAddresses', {}).get('lan_ipv4', ''))
-    except Exception as e:
-        print('Error ' + str(e))
-    
-    ip_list = [x for x in ip_list if x]
-    return list(set(ip_list))
 
 
 def getCommonEPs(consul_ip_list, aci_parsed_eps):
@@ -387,6 +391,9 @@ def consul_node_list():
             ip_list.append(node.get('TaggedAddresses', {}).get('lan', ''))
             ip_list.append(node.get('TaggedAddresses', {}).get('lan_ipv4', ''))
 
+        # for removing '' from ip_list
+        ip_list = [ip for ip in ip_list if ip]
+
         node_list.append({
             'nodeID': node.get('ID', ''),
             'nodeName': node.get('Node', ''),
@@ -449,6 +456,7 @@ def consul_service_check(service_name):
 
 
 def consul_service_tags_kind(service_name):
+    """Details of a service from service-details API"""
 
     service_resp = requests.get('{}/v1/catalog/service/{}'.format('http://10.23.239.14:8500', service_name))
     service_resp = json.loads(service_resp.content)
