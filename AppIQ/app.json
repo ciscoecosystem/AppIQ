@@ -33,7 +33,7 @@
         "vmm-connectivity"
     ],
     "permissionslevel":"read",
-    "shortdescr":"The AppIQ app can link together ACI and AppDynamics.",
+    "shortdescr":"AppIQ provides application service visibility to ACI operator with contextual troubleshooting capabilities.",
     "vendor":"Cisco",
     "vendordomain":"Cisco",
     "version":"1.4"
