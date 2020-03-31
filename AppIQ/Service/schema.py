@@ -163,7 +163,7 @@ class Query(graphene.ObjectType):
         SaveMapping.savemapping = app.save_mapping(int(appId), str(tn), mappedData)
         return SaveMapping
 
-    def resolve_Run(self, info, tn, appId):  # On APIC
+    def resolve_Run(self, info, tn):  # On APIC
         # def resolve_Run(self,args,context,info): # On local desktop (Uncomment appId and tn args)
         #    tn = args.get('tn')
         #    appId = int(args.get('appId'))

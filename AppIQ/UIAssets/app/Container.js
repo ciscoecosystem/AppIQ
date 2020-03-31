@@ -232,7 +232,7 @@ class Container extends React.Component {
             return (
              
                 <div style={{minWidth:"950px"}}>
-                    <Header text=" List of Datacenter" applinktext="" instanceName={headerInstanceName}/>
+                    <Header text=" Consul Datacenters" applinktext="" instanceName={headerInstanceName}/>
                     <Toolbar onReload={this.reloading} />
               
                     <AppTable rows={list} tenantName={this.tenantName}></AppTable>

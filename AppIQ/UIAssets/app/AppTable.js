@@ -13,8 +13,9 @@ export default class AppTable extends React.Component{
             jsonData : this.props.rows
         }
         this.columns = [
-            { Header : "Datacenter List",
-            accessor : PROFILE_NAME    
+            {
+                Header : "",
+                accessor : PROFILE_NAME
             },
             {
                 Header : "",
@@ -45,7 +46,7 @@ export default class AppTable extends React.Component{
         window.location.href = `details.html?${PROFILE_NAME}=` + encodeURIComponent(data[PROFILE_NAME]) + "&tn=" + encodeURIComponent(this.state.tenantName);
     }
     render(){
-      return  <Table data={this.props.rows} columns={this.columns}></Table>
+      return  <Table data={this.props.rows} columns={this.columns} TheadComponent={props => null}></Table>
     }
 
 }
