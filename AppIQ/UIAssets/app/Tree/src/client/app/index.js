@@ -428,6 +428,10 @@ class App extends React.Component {
       document.body.style.overflow = "scroll"
     }
 
+    componentDidMount() {
+      this.getData();
+    }
+
     reload() {
         // alert("Reloading");
         loadingBoxShow("block");
@@ -530,30 +534,17 @@ class App extends React.Component {
   }
 
     render() {
-		  var bool = this.getData();
-
       loadingBoxHide();
 
       let apptext = " " + this.state.result[PROFILE_NAME]; // CONSUL changes
       let title = " | View"
       
-      if (bool) {
         return (
             <div>
                 <Header text={title} applinktext={apptext} instanceName={headerInstanceName}/>
                 <TestComponent key={key} data={treedata} reloadController={this.reload}/>
             </div>
         );
-      } else {
-        treedata = [];
-        key = key + 1;
-        return (
-          <div>
-              <Header text={title} applinktext={apptext} instanceName={headerInstanceName}/>
-              <TestComponent key={key} data={treedata} reloadController={this.reload}/>
-          </div>
-      );
-      }
     }
 }
 
