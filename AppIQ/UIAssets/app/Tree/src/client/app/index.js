@@ -416,7 +416,6 @@ class App extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            reloadCount : 0,
             result: {}
         }
 
@@ -435,13 +434,7 @@ class App extends React.Component {
     reload() {
         // alert("Reloading");
         loadingBoxShow("block");
-
-        setTimeout( ()=>{
-			    this.setState({
-            reloadCount : this.state.reloadCount + 1,
-          })
-        },10);
-        
+        this.getData();
     }
 
     getData() {  
