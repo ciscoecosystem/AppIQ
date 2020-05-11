@@ -80,7 +80,7 @@ class Container extends Component {
         /**
         * Use this.httpGet to get data from REST API
         */
-       let payload = DC_DETAILS_QUERY_PAYLOAD(result['tn']);
+       let payload = DC_DETAILS_QUERY_PAYLOAD(result['tn'], result[PROFILE_NAME]);
         // let payload = {
         //     query: 'query{Details(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){details}}'
         // }
@@ -155,7 +155,7 @@ class Container extends Component {
 
     fetchData() {
     
-        let payload = DC_DETAILS_QUERY_PAYLOAD(result['tn']);
+        let payload = DC_DETAILS_QUERY_PAYLOAD(result['tn'], result[PROFILE_NAME]);
         // let payload = {
         //     query: 'query{Details(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){details}}'
         // }
@@ -240,7 +240,7 @@ class Container extends Component {
       }
 
     handleBackClick() {
-        window.location.href = "app.html";
+        window.location.href = "index.html";
     }
 
     CONSUL_setExpand(index) {    

@@ -1,6 +1,7 @@
 import React from 'react'
 import Header from '../Header'
 import ClusterList from './ClusterList'
+import { PROFILE_NAME } from '../../constants.js';
 import './style.css'
 
 function getCookieVal(offset) {
@@ -49,7 +50,7 @@ class Container extends React.Component {
         /**
         * Use this.httpGet to get data from REST API
         */
-        let payload = { query: 'query{Mapping(tn:"' + result['tn'] + '",appId:"' + result['appId'] + '"){mappings}}' }
+        let payload = { query: 'query{Mapping(tn:"' + result['tn'] + '",datacenter:"' + result[PROFILE_NAME] + '"){mappings}}' }
 
         let mappings_json_data = {
             target_cluster : [],
@@ -135,7 +136,8 @@ class Container extends React.Component {
             "sourceClusterList": sourceJsonData,
             "targetClusterList": targetJsonData,
             "sourceSelected": null,
-            "targetSelected": null
+            "targetSelected": null,
+            datacenterName : result[PROFILE_NAME]
         };
 
         this.insertIntoTarget = this.insertIntoTarget.bind(this);
@@ -272,7 +274,7 @@ class Container extends React.Component {
         let mappingList = JSON.stringify(this.state.targetClusterList);
         // let url = document.location.origin + "/appcenter/Cisco/AppIQ/saveMapping.json?appId=" + encodeURIComponent(this.props.appId) + "&data=" + encodeURIComponent(mappingList);
         let url = document.location.origin + "/appcenter/Cisco/AppIQ/graphql.json"
-        let payload = { query: 'query{SaveMapping(appId:"' + this.props.appId + '",tn:"' + this.props.tenantName + '",data:"' + mappingList.replace(/"/g, '\'') + '"){savemapping}}'}
+        let payload = { query: 'query{SaveMapping(datacenter:"' + this.state.datacenterName + '",tn:"' + this.props.tenantName + '",data:"' + mappingList.replace(/"/g, '\'') + '"){savemapping}}'}
         console.log("Payload");
         console.log(payload);
         xhr.open("POST", url, false);

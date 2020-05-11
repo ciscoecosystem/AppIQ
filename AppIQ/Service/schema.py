@@ -81,7 +81,7 @@ class Query(graphene.ObjectType):
     GetFaults = graphene.Field(GetFaults, dn=graphene.String())
     GetEvents = graphene.Field(GetEvents, dn=graphene.String())
     GetAuditLogs = graphene.Field(GetAuditLogs, dn=graphene.String())
-    GetOperationalInfo = graphene.Field(GetOperationalInfo, dn = graphene.String(), moType = graphene.String(), ipList = graphene.String())
+    GetOperationalInfo = graphene.Field(GetOperationalInfo, dn = graphene.String(), moType = graphene.String(), macList = graphene.String())
     GetConfiguredAccessPolicies = graphene.Field(GetConfiguredAccessPolicies, tn = graphene.String(), ap = graphene.String(), epg = graphene.String())
     GetToEpgTraffic = graphene.Field(GetToEpgTraffic, dn = graphene.String())
     GetSubnets = graphene.Field(GetSubnets, dn = graphene.String())
@@ -102,8 +102,8 @@ class Query(graphene.ObjectType):
         GetAuditLogs.auditLogsList = app.get_audit_logs(dn)
         return GetAuditLogs
     
-    def resolve_GetOperationalInfo(self, info, dn, moType, ipList):
-        GetOperationalInfo.operationalList = app.get_childrenEp_info(dn, moType, ipList)
+    def resolve_GetOperationalInfo(self, info, dn, moType, macList):
+        GetOperationalInfo.operationalList = app.get_childrenEp_info(dn, moType, macList)
         return GetOperationalInfo
 
     def resolve_GetConfiguredAccessPolicies(self, info, tn, ap, epg):
@@ -163,18 +163,18 @@ class Query(graphene.ObjectType):
         SaveMapping.savemapping = app.save_mapping(int(appId), str(tn), mappedData)
         return SaveMapping
 
-    def resolve_Run(self, info, tn):  # On APIC
+    def resolve_Run(self, info, tn, appId):  # On APIC
         # def resolve_Run(self,args,context,info): # On local desktop (Uncomment appId and tn args)
         #    tn = args.get('tn')
         #    appId = int(args.get('appId'))
-        Run.response = app.tree(tn, 9)
+        Run.response = app.tree(tn, int(appId))
         return Run
 
-    def resolve_Details(self, info, tn):  # On APIC
+    def resolve_Details(self, info, tn, appId):  # On APIC
         # def resolve_Details(self,args,context,info):# On local desktop (Uncomment appId and tn args)
         #    tn = args.get('tn')
         #    appId = int(args.get('appId'))
-        Details.details = app.get_details(tn, 9)
+        Details.details = app.get_details(tn, int(appId))
         return Details
 
         # def resolve_EnableView(self, args, context, info):

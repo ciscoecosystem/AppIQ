@@ -14,8 +14,6 @@ import "./style.css";
 import DetailsPane from "./DetailsPane";
 import DetailsPage from "./DetailsPage";
 
-import LegendNode from "./LegendNode.js";
-
 const svgSquare = {
   shape: "rect",
   shapeProps: {
@@ -82,15 +80,6 @@ export default class Tree extends React.Component {
       initialRender: true,
       data: this.assignInternalProperties(clone(props.data)),
 
-      detailsPane: {
-        visible: false,
-        data: {}
-      },
-
-      detailsPage: {
-        visible: false,
-        data: {}
-      }
     };
     this.findNodesById = this.findNodesById.bind(this);
     this.collapseNode = this.collapseNode.bind(this);
@@ -181,21 +170,31 @@ export default class Tree extends React.Component {
    * @return {void}
    */
   bindZoomListener(props) {
-    const { zoomable, scaleExtent, translate } = props;
+    var eventListining = undefined
+    let thiss = this;
+    
+    const { zoomable, scaleExtent, translate, scale } = props;
     boundEvent = behavior
       .zoom()
       .scaleExtent([scaleExtent.min, scaleExtent.max])
       .on("zoom", () => {
-        g.attr(
+        eventListining = event; // tracking event
+
+        g
+        .attr(
           "transform",
           `translate(${event.translate}) scale(${event.scale})`
         );
       })
+      .on("zoomend", () => {
+        thiss.props.handleTransitionTree(eventListining.translate, eventListining.scale);
+      })
+      .scale(scale)
       // Offset so that first pan and zoom does not jump back to [0,0] coords
       .translate([translate.x, translate.y]);
     const svg = select(".rd3t-svg");
     const g = select(".rd3t-g");
-
+  
     if (zoomable) {
       svg.call(boundEvent);
     }
@@ -362,54 +361,28 @@ export default class Tree extends React.Component {
    * Opens a Right panel with data of clicked node
    */
   openDetailsPane(nodeData) {
-    this.setState({
-      detailsPane: {
-        visible: true,
-        data: nodeData
-      }
-    });
-   // this.openDetailsPage(nodeData);
+    this.props.toggleDetailsPane(nodeData);
   }
 
  /**
    * Closes a right panel
    */
   closeDetailsPane() {
-    
-    this.setState({
-      detailsPane: {
-        visible: false,
-        data : {}
-       
-      }
-    });
+    this.props.toggleDetailsPane();
   }
 
    /**
    * Opens a details page with data (more details) of clicked node
    */
   openDetailsPage(nodeData) {
-   console.log("open deatails")
-   console.log(nodeData)
-    this.setState({
-      detailsPage: {
-        visible: true,
-        data: nodeData
-      }
-    });
+    this.props.toggleeDetailsPage(nodeData);
   }
 
    /**
    * Closes details page
    */
   closeDetailsPage() {
-
-    this.setState({
-      detailsPage: {
-        visible: false,
-         data:{}
-      }
-    });
+    this.props.toggleeDetailsPage();
   }
 
   /**
@@ -472,6 +445,7 @@ export default class Tree extends React.Component {
       nodeSvgShape,
       orientation,
       translate,
+      scale,
       pathFunc,
       transitionDuration,
       zoomable,
@@ -493,8 +467,6 @@ export default class Tree extends React.Component {
 
     const windowHeight = parseFloat(window.innerHeight) / 2;
     const windowWidth = parseFloat(window.innerWidth) / 2 - 80;
-
-    // alert(windowHeight + " : " + windowWidth)
 
     if (nodes.length == 0) {
       return (
@@ -525,7 +497,7 @@ export default class Tree extends React.Component {
             zoomable ? "rd3t-grabbable" : undefined
           }`}
         >
-          <svg className="rd3t-svg" width="100%" height="80%">
+          <svg className="rd3t-svg" width="100%" height="100%">
             <defs>
               <marker
                 id="arrow"
@@ -546,9 +518,10 @@ export default class Tree extends React.Component {
             <TransitionGroup
               component="g"
               className="rd3t-g"
-              transform={`translate(${translate.x},${translate.y})`}
+              transform={`translate(${translate.x},${translate.y}) scale(${scale})`}
             >
-              {links.map(linkData => (
+               {/* the links under root node is avoided */}
+              {links.slice(this.props.totApps).map(linkData => (
                 <Link
                   key={uuid.v4()}
                   orientation={orientation}
@@ -559,7 +532,8 @@ export default class Tree extends React.Component {
                 />
               ))}
 
-              {nodes.map(nodeData => (
+              {/* root node is avoided */}
+              {nodes.slice(1).map(nodeData => (
                 <Node
                   key={nodeData.id}
                   nodeSvgShape={nodeSvgShape}
@@ -586,21 +560,20 @@ export default class Tree extends React.Component {
         </div>
 
         <div>
-          {this.state.detailsPane.visible ? (
+          {this.props.detailsPane.visible ? (
             <DetailsPane
               closeDetailsPane={this.closeDetailsPane}
               openDetailsPage={this.openDetailsPage}
-              data={this.state.detailsPane.data}
+              data={this.props.detailsPane.data}
             />
           ) : null}   
-          {/* {this.state.detailsPage.visible ? (
+          {this.props.detailsPage.visible ? (
             <DetailsPage
-              data = {this.state.detailsPage.data}
+              data = {this.props.detailsPage.data}
               closeDetailsPage={this.closeDetailsPage}
+              datacenterName={this.props.datacenterName}
             />
           ) : null}
-
-        */}
         </div>
       </div>
     );
@@ -618,7 +591,7 @@ Tree.defaultProps = {
   orientation: "horizontal",
   translate: { x: 0, y: 0 },
   pathFunc: "diagonal",
-  transitionDuration: 500,
+  // transitionDuration: 0,
   depthFactor: undefined,
   collapsible: true,
   initialDepth: undefined,
@@ -638,6 +611,7 @@ Tree.defaultProps = {
 
 Tree.propTypes = {
   data: PropTypes.array.isRequired,
+  datacenterName: PropTypes.string,
   nodeSvgShape: PropTypes.shape({
     shape: PropTypes.string,
     shapeProps: PropTypes.object
