@@ -36,5 +36,5 @@
     "shortdescr":"The Consul app can link together ACI and Consul.",
     "vendor":"Cisco",
     "vendordomain":"Cisco",
-    "version":"1.0"
+    "version":"0.1"
 }
